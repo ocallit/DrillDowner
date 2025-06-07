@@ -1,0 +1,11 @@
+{
+  "devDependencies": {
+    "terser": "^5.19.0",
+    "clean-css-cli": "^5.6.0"
+  },
+  "scripts": {
+    "build": "npm run build:js && npm run build:css",
+    "build:js": "terser src/DrillDowner.js -o dist/DrillDowner.min.js --source-map --source-map-url DrillDowner.min.js.map --compress --mangle",
+    "build:css": "clean-css-cli src/drilldowner.css -o dist/drilldowner.min.css --source-map"
+  }
+}

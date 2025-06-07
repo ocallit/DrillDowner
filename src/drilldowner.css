@@ -1,0 +1,183 @@
+
+
+.drillDowner_table { border-collapse: collapse; }
+.drillDowner_table th, .drillDowner_table td {
+    border: 1px solid #aaa; padding: 4px 8px; background: #fff; vertical-align: top;
+}
+
+.drillDowner_table th {
+    position: sticky;
+    top: 0;
+    background: #dbefff;
+}
+.drillDownerThTotal {border-bottom:6px black double!important;}
+.drillDownerTfootTotal {border-top:6px black double!important;text-align: right;font-weight:bold}
+.drillDowner_num { text-align: right; }
+.drillDowner_drill_icon {
+    cursor: pointer; display: inline-block; width: 1em; text-align: center;
+    user-select: none; margin-right: 0.5em;
+}
+.drillDowner_drill_collapsed:before { content: "▶"; color: darkgreen}
+.drillDowner_right {text-align: right}
+.drillDowner_center {text-align: center}
+
+.drillDowner_drill_expanded:before { content: "▼"; color: darkgreen}
+.drillDowner_indent_0 { padding-left: 0; }
+.drillDowner_indent_1 { padding-left: 2em; }
+.drillDowner_indent_2 { padding-left: 3em; }
+.drillDowner_indent_3 { padding-left: 4em; }
+.drillDowner_indent_4 { padding-left: 5em; }
+.drillDowner_indent_5 { padding-left: 6em; }
+.drillDowner_az_bar {
+    display: flex; flex-direction: column; align-items: center; margin-right: 10px;
+    font-size: 1.2em; line-height: 1.5em; user-select: none;
+    position: sticky; top: 8px; max-height: 80vh; overflow-y: auto;
+}
+.drillDowner_az_bar div { height: 1.2em; width: 1.4em; }
+.drillDowner_az_dimmed { color: #999; opacity: 0.3; text-align: center; }
+.drillDowner_az_link { color: #2572b6; text-decoration: none; font-weight: bold; display: block; text-align: center; }
+.drillDowner_az_link:hover { text-decoration: underline; background: #e0ecf6; border-radius: 4px; }
+.drillDowner_layout_container { display: flex; flex-direction: row; align-items: flex-start; }
+
+
+
+/** controls & breadcrumbs **/
+/* Modern Controls Container */
+.drillDowner_controls_container {
+    background: white;
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e2e8f0;
+}
+
+/* Breadcrumb Navigation */
+.drillDowner_breadcrumb_nav {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.drillDowner_breadcrumb_item {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    font-weight: 500;
+    position: relative;
+    user-select: none;
+    background: #f8fafc;
+    color: #374151;
+}
+
+.drillDowner_breadcrumb_item:hover {
+    background: #f1f5f9;
+    transform: translateY(-1px);
+    color: #1f2937;
+}
+
+/* Interactive Arrow States */
+.drillDowner_breadcrumb_arrow {
+    color: #10b981;
+    margin: 0 8px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+    background: #f3f4f6;
+}
+
+.drillDowner_breadcrumb_arrow:hover {
+    background: #e5e7eb;
+    color: #059669;
+    transform: scale(1.1);
+}
+
+/* Arrow states based on expansion */
+.drillDowner_breadcrumb_arrow.drillDowner_expanded {
+    background: #dcfce7;
+}
+
+.drillDowner_breadcrumb_arrow.drillDowner_collapsed {
+    background: #f3f4f6;
+}
+
+.drillDowner_breadcrumb_arrow.drillDowner_expanded:hover {
+    background: #bbf7d0;
+    color: #059669;
+}
+
+.drillDowner_breadcrumb_arrow.drillDowner_collapsed:hover {
+    background: #e5e7eb;
+    color: #059669;
+}
+
+/* Arrow rotation animation */
+.drillDowner_breadcrumb_arrow {
+    transform-origin: center;
+}
+
+.drillDowner_breadcrumb_arrow.drillDowner_expanded .drillDowner_arrow_icon {
+    transform: rotate(90deg);
+}
+
+.drillDowner_breadcrumb_arrow.drillDowner_collapsed .drillDowner_arrow_icon {
+    transform: rotate(0deg);
+}
+
+.drillDowner_arrow_icon {
+    transition: transform 0.2s ease;
+}
+
+/* Grouping Controls */
+.drillDowner_grouping_controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.drillDowner_control_group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.drillDowner_control_label {
+    font-size: 14px;
+    color: #64748b;
+    font-weight: 500;
+}
+
+.drillDowner_modern_select {
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: white;
+    font-size: 14px;
+    min-width: 200px;
+    cursor: pointer;
+    transition: border-color 0.2s ease;
+}
+
+.drillDowner_modern_select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/** controls & breadcrumbs **/
+

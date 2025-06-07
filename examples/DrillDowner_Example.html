@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+    <title>DrillDowner Example</title>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <link href="../src/drilldowner.css" rel="stylesheet"  type="text/css"/>
+    <script src="../src/DrillDowner.js"></script>
+</head>
+<body>
+<div id="controls"></div>
+<div class="drillDowner_layout_container">
+    <div id="table"></div>
+    <div id="azbar"></div>
+</div>
+<script>
+    const demoData = [
+        {p:"Zeta", c:"Naranja", w:"W2", rolls:32, quantity:72, unidades:"Kg", sale:"", slow:false, superslow:false, customFlag:true, status:"pending", priority:3},
+        {p:"Alpha", c:"Rojo", w:"W1", rolls:12, quantity:122, unidades:"Kg", sale:"S", slow:false, superslow:false, customFlag:true, status:"completed", priority:1},
+        {p:"Alpha", c:"Rojo", w:"W2", rolls:2, quantity:22, unidades:"Kg", sale:"", superslow:false, status:"active", priority:2},
+        {p:"Alpha", c:"Azul", w:"W1", rolls:3, quantity:10, unidades:"Kg", sale:"", slow:false, superslow:true, customFlag:false, status:"pending", priority:1},
+        {p:"Beta", c:"Verde", w:"W1", rolls:4, quantity:30, unidades:"m", sale:"", slow:false, superslow:false, customFlag:true, status:"completed", priority:2},
+        {p:"Gamma", c:"Rojo", w:"W2", rolls:1, quantity:15, unidades:"m", sale:"S", slow:false, superslow:false, customFlag:false, status:"active", priority:3},
+        {p:"Delta", c:"Amarillo", w:"W3", rolls:7, quantity:54, unidades:"Kg", sale:"", slow:true, superslow:true, customFlag:false, status:"pending", priority:1},
+        {p:"Zeta", c:"Naranja", w:"W1", rolls:3, quantity:70, unidades:"Kg", sale:"", slow:false, superslow:false, customFlag:true, status:"completed", priority:2},
+        {p:"Zeta", c:"Naranja2", w:"W1", rolls:3, quantity:70, unidades:"m", sale:"", slow:false, superslow:false, customFlag:true, status:"completed", priority:2},
+    ];
+    $(function() {
+        window.drillDowner = new DrillDowner('#table', demoData, {
+            groupOrder: ["p", "c", "w"],
+            groupOrderCombinations: [
+                ["p", "c", "w"],
+                ["p", "w", "c"],
+                ["w", "p", "c"],
+            ],
+            totals: ["rolls", "quantity"],
+            columns: ["unidades", "sale", "status", "slow"],
+            colProperties: {
+                "p": {
+                    label: "Producto",
+                    key: "product",
+                    labelClass: "header_producto"
+                },
+                "c": {
+                    label: "Color",
+                    key: "color",
+                    labelClass: "header_color"
+                },
+                "w": {
+                    label: "Almacén",
+                    key: "warehouse",
+                    labelClass: "header_almacen"
+                },
+                "rolls": {
+                    label: "Rollos",
+                    decimals: 0,
+                    class: "lupa_num"
+                },
+                "quantity": {
+                    label: "Cantidad",
+                    decimals: 2,
+                    subTotalBy: "unidades",
+                    class: "lupa_num"
+                },
+                "unidades": {
+                    label: "Kg/m",
+                    togglesUp: true,  // Now shows combined values like "Kg, m"
+                    class: "",
+                    formatter: function(value, row) {
+                        // Display the actual unit (Kg, m, etc.)
+                        return value || "";
+                    }
+                },
+                "slow": {
+                    label: "Lento",
+                    togglesUp: true,
+                    class: "lupa_status_slow",
+                    formatter: function(value, row) {
+                        return value ? "●" : "";
+                    }
+                },
+                "sale": {
+                    label: "En Oferta",
+                    togglesUp: true,
+                    class: "lupa_status_sale"
+                },
+                "superslow": {
+                    label: "Muy Lento",
+                    togglesUp: true,
+                    class: "lupa_status_superslow"
+                },
+                "status": {
+                    label: "Estado",
+                    class: "",
+                    formatter: function(value, row) {
+                        // Custom formatter for status strings
+                        const statusMap = {
+                            "pending": "⏳ Pendiente",
+                            "active": "🔄 Activo",
+                            "completed": "✅ Completado"
+                        };
+                        return statusMap[value] || value;
+                    }
+                },
+                "priority": {
+                    label: "Prioridad",
+                    class: "",
+                    formatter: function(value, row) {
+                        // Custom formatter that uses both value and row data
+                        const stars = "★".repeat(value);
+                        const color = value === 1 ? 'color: red' : value === 2 ? 'color: orange' : 'color: gray';
+                        return `<span style="${color}">${stars}</span>`;
+                    }
+                }
+            },
+
+            azBarSelector: '#azbar',
+            controlsSelector: '#controls'
+        });
+    });
+</script>
+</body>
+</html>

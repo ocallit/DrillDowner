@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DrillDowner QUnit Test Suite</title>
+
+    <!-- QUnit CSS and JS -->
+    <link rel="stylesheet" href="https://code.jquery.com/qunit/qunit-2.19.4.css">
+    <script src="https://code.jquery.com/qunit/qunit-2.19.4.js"></script>
+
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+    <!-- DrillDowner files - these would need to be included in your test environment -->
+    <link href="../src/drilldowner.css" rel="stylesheet"  type="text/css"/>
+    <script src="../src/DrillDowner.js"></script>
+</head>
+<body>
+<div id="qunit"></div>
+<div id="qunit-fixture">
+    <!-- Test containers -->
+    <div id="test-container"></div>
+    <div id="test-controls"></div>
+    <div id="test-azbar"></div>
+</div>
+
+<script>
+    // Test data
+    const testData = [
+        {p:"Zeta", c:"Naranja", w:"W2", rolls:32, quantity:72, unidades:"Kg", sale:false, slow:false, superslow:false, customFlag:true, status:"pending", priority:3},
+        {p:"Alpha", c:"Rojo", w:"W1", rolls:12, quantity:122, unidades:"Kg", sale:true, slow:false, superslow:false, customFlag:true, status:"completed", priority:1},
+        {p:"Alpha", c:"Rojo", w:"W2", rolls:2, quantity:22, unidades:"Kg", sale:false, superslow:false, status:"active", priority:2},
+        {p:"Alpha", c:"Azul", w:"W1", rolls:3, quantity:10, unidades:"Kg", sale:false, slow:false, superslow:true, customFlag:false, status:"pending", priority:1},
+        {p:"Beta", c:"Verde", w:"W1", rolls:4, quantity:30, unidades:"m", sale:false, slow:false, superslow:false, customFlag:true, status:"completed", priority:2},
+        {p:"Gamma", c:"Rojo", w:"W2", rolls:1, quantity:15, unidades:"m", sale:true, slow:false, superslow:false, customFlag:false, status:"active", priority:3},
+        {p:"Delta", c:"Amarillo", w:"W3", rolls:7, quantity:54, unidades:"Kg", sale:false, slow:true, superslow:true, customFlag:false, status:"pending", priority:1},
+        {p:"Zeta", c:"Naranja", w:"W1", rolls:3, quantity:70, unidades:"Kg", sale:false, slow:false, superslow:false, customFlag:true, status:"completed", priority:2},
+        {p:"Zeta", c:"Naranja2", w:"W1", rolls:3, quantity:70, unidades:"m", sale:false, slow:false, superslow:false, customFlag:true, status:"completed", priority:2},
+    ];
+
+    const testColProperties = {
+        "p": {
+            label: "Producto",
+            key: "product",
+            labelClass: "header_producto"
+        },
+        "c": {
+            label: "Color",
+            key: "color",
+            labelClass: "header_color"
+        },
+        "w": {
+            label: "Almacén",
+            key: "warehouse",
+            labelClass: "header_almacen"
+        },
+        "rolls": {
+            label: "Rollos",
+            decimals: 0,
+            class: "lupa_num"
+        },
+        "quantity": {
+            label: "Cantidad",
+            decimals: 2,
+            subTotalBy: "unidades",
+            class: "lupa_num"
+        },
+        "unidades": {
+            label: "Kg/m",
+            togglesUp: true,
+            class: "",
+            formatter: function(value, row) {
+                return value || "";
+            }
+        },
+        "slow": {
+            label: "Lento",
+            togglesUp: true,
+            class: "lupa_status_slow",
+            formatter: function(value, row) {
+                return value ? "●" : "";
+            }
+        },
+        "sale": {
+            label: "En Oferta",
+            togglesUp: true,
+            class: "lupa_status_sale"
+        },
+        "superslow": {
+            label: "Muy Lento",
+            togglesUp: true,
+            class: "lupa_status_superslow"
+        },
+        "status": {
+            label: "Estado",
+            class: "",
+            formatter: function(value, row) {
+                const statusMap = {
+                    "pending": "⏳ Pendiente",
+                    "active": "🔄 Activo",
+                    "completed": "✅ Completado"
+                };
+                return statusMap[value] || value;
+            }
+        },
+        "priority": {
+            label: "Prioridad",
+            class: "",
+            formatter: function(value, row) {
+                const stars = "★".repeat(value);
+                const color = value === 1 ? 'color: red' : value === 2 ? 'color: orange' : 'color: gray';
+                return `<span style="${color}">${stars}</span>`;
+            }
+        }
+    };
+
+    // QUnit Tests
+    QUnit.module('DrillDowner Initialization', function() {
+        QUnit.test('Basic initialization with minimal options', function(assert) {
+            const container = '#test-container';
+            $(container).empty();
+
+            const drillDowner = new DrillDowner(container, testData, {
+                groupOrder: ["p"],
+                columns: ["status"],
+                totals: ["rolls"]
+            });
+
+            assert.ok(drillDowner instanceof DrillDowner, 'DrillDowner instance created');
+            assert.ok($(container).find('table.drillDowner_table').length > 0, 'Table is rendered');
+            assert.ok(drillDowner.options.idPrefix.length > 0, 'ID prefix is generated');
+
+            drillDowner.destroy();
+        });
+
+        QUnit.test('Initialization with all options', function(assert) {
+            const container = '#test-container';
+            const controls = '#test-controls';
+            const azbar = '#test-azbar';
+
+            $(container).empty();
+            $(controls).empty();
+            $(azbar).empty();
+
+            const drillDowner = new DrillDowner(container, testData, {
+                groupOrder: ["p", "c", "w"],
+                columns: ["status", "priority"],
+                totals: ["rolls", "quantity"],
+                colProperties: testColProperties,
+                azBarSelector: azbar,
+                controlsSelector: controls
+            });
+
+            assert.ok(drillDowner instanceof DrillDowner, 'DrillDowner instance created');
+            assert.ok($(container).find('table.drillDowner_table').length > 0, 'Table is rendered');
+            assert.ok($(controls).find('.drillDowner_controls_container').length > 0, 'Controls are rendered');
+            assert.ok($(azbar).find('.drillDowner_az_link').length > 0, 'AZ bar is rendered');
+
+            drillDowner.destroy();
+        });
+
+        QUnit.test('Initialization with empty data', function(assert) {
+            const container = '#test-container';
+            $(container).empty();
+
+            const drillDowner = new DrillDowner(container, [], {
+                groupOrder: ["p"],
+                columns: ["status"],
+                totals: ["rolls"]
+            });
+
+            assert.ok(drillDowner instanceof DrillDowner, 'DrillDowner instance created with empty data');
+            assert.ok($(container).find('table.drillDowner_table').length > 0, 'Table is rendered even with empty data');
+
+            drillDowner.destroy();
+        });
+    });
+
+    QUnit.module('DrillDowner Table Rendering', function() {
+        QUnit.test('Table structure is correct', function(assert) {
+            const container = '#test-container';
+            $(container).empty();
+
+            const drillDowner = new DrillDowner(container, testData, {
+                groupOrder: ["p", "c"],
+                columns: ["status"],
+                totals: ["rolls"],
+                colProperties: testColProperties
+            });
+
+            const $table = $(container).find('table.drillDowner_table');
+            assert.ok($table.length > 0, 'Table exists');
+
+            const $thead = $table.find('thead');
+            assert.ok($thead.length > 0, 'Table header exists');
+
+            const $tbody = $table.find('tbody');
+            assert.ok($tbody.length > 0, 'Table body exists');
+
+            const headerCount = $thead.find('th').length;
+            assert.equal(headerCount, 3, 'Correct number of headers (Item + 1 total + 1 column)');
+
+            drillDowner.destroy();
+        });
+
+        QUnit.test('Drill icons are present at appropriate levels', function(assert) {
+            const container = '#test-container';
+            $(container).empty();
+
+            const drillDowner = new DrillDowner(container, testData, {
+                groupOrder: ["p", "c"],
+                columns: ["status"],
+                totals: ["rolls"]
+            });
+
+            const $level0Rows = $(container).find('tr[data-level="0"]');
+            const $level1Rows = $(container).find('tr[data-level="1"]');
+
+            assert.ok($level0Rows.length > 0, 'Level 0 rows exist');
+            assert.ok($level1Rows.length > 0, 'Level 1 rows exist');
+
+            // Level 0 should have drill icons (can drill to level 1)
+            const level0DrillIcons = $level0Rows.find('.drillDowner_drill_icon').length;
+            assert.ok(level0DrillIcons > 0, 'Level 0 rows have drill icons');
+
+            // Level 1 should not have drill icons (last level)
+            const level1DrillIcons = $level1Rows.find('.drillDowner_drill_icon').length;
+            assert.equal(level1DrillIcons, 0, 'Level 1 rows do not have drill icons');
+
+            drillDowner.destroy();
+        });
+
+        QUnit.test('Totals are calculated correctly', function(assert) {
+            const container = '#test-container';
+            $(container).empty();
+
+            const drillDowner = new DrillDowner(container, testData, {
+                groupOrder: ["p"],
+                columns: [],
+                totals: ["rolls"],
+                colProperties: testColProperties
+            });
+
+            // Check that totals are displayed in the table
+            const $table = $(container).find('table.drillDowner_table');
+            const $totalCells = $table.find('td.drillDowner_num');
+
+            assert.ok($totalCells.length > 0, 'Total cells are present');
+
+            // Verify at least one total is a number
+            let foundNumericTotal = false;
+            $totalCells.each(function() {
+                const text = $(this).text().trim();
+                if (!isNaN(parseFloat(text))) {
+                    foundNumericTotal = true;
+                }
+            });
+            assert.ok(foundNumericTotal, 'At least one numeric total found');
+
+            drillDowner.destroy();
+        });
+    });
+
+    QUnit.module('DrillDowner Collapse/Expand Functionality', function() {
+        QUnit.test('collapseToLevel works correctly', function(assert) {
+            const container = '#test-container';
+            $(container).empty();
+
+            const drillDowner = new DrillDowner(container, testData, {
+                groupOrder: ["p", "c", "w"],
+                columns: ["status"],
+                totals: ["rolls"]
+            });
+
+            // Initially collapsed to level 0
+            let visibleRows = $(container).find('tbody tr:visible').length;
+            let level0Rows = $(container).find('tr[data-level="0"]:visible').length;
+            assert.equal(visibleRows, level0Rows, 'Initially only level 0 rows are visible');
+
+            // Expand to level 1
+            drillDowner.collapseToLevel(1);
+            visibleRows = $(container).find('tbody tr:visible').length;
+            level0Rows = $(container).find('tr[data-level="0"]:visible').length;
+            const level1Rows = $(container).find('tr[data-level="1"]:visible').length;
+            assert.equal(visibleRows, level0Rows + level1Rows, 'Level 0 and 1 rows are visible');
+
+            // Collapse back to level 0
+            drillDowner.collapseToLevel(0);
+            visibleRows = $(container).find('tbody tr:visible').length;
+            level0Rows = $(container).find('tr[data-level="0"]:visible').length;
+            assert.equal(visibleRows, level0Rows, 'Back to only level 0 rows visible');
+
+            drillDowner.destroy();
+        });
+
+        QUnit.test('collapseAll and expandAll work correctly', function(assert) {
+            const container = '#test-container';
+            $(container).empty();
+
+            const drillDowner = new DrillDowner(container, testData, {
+                groupOrder: ["p", "c", "w"],
+                columns: ["status"],
+                totals: ["rolls"]
+            });
+
+            // Test expandAll
+            drillDowner.expandAll();
+            const allVisibleRows = $(container).find('tbody tr:visible').length;
+            const totalRows = $(container).find('tbody tr').length;
+            assert.equal(allVisibleRows, totalRows, 'expandAll shows all rows');
+
+            // Test collapseAll
+            drillDowner.collapseAll();
+            const visibleRows = $(container).find('tbody tr:visible').length;
+            const level0Rows = $(container).find('tr[data-level="0"]').length;
+            assert.equal(visibleRows, level0Rows, 'collapseAll shows only level 0 rows');
+
+            drillDowner.destroy();
+        });
+
+        QUnit.test('Individual drill click functionality', function(assert) {
+            const container = '#test-container';
+            $(container).empty();
+
+            const drillDowner = new DrillDowner(container, testData, {
+                groupOrder: ["p", "c"],
+                columns: ["status"],
+                totals: ["rolls"]
+            });
+
+            // Find the first drill icon
+            const $firstDrillIcon = $(container).find('.drillDowner_drill_icon').first();
+            assert.ok($firstDrillIcon.length > 0, 'Drill icon found');
+            assert.ok($firstDrillIcon.hasClass('drillDowner_drill_collapsed'), 'Initially collapsed');
+
+            // Simulate click
+            $firstDrillIcon.click();
+
+            // Check if it expanded
+            assert.ok($firstDrillIcon.hasClass('drillDowner_drill_expanded'), 'Icon is now expanded');
+
+            // Click again to collapse
+            $firstDrillIcon.click();
+            assert.ok($firstDrillIcon.hasClass('drillDowner_drill_collapsed'), 'Icon is collapsed again');
+
+            drillDowner.destroy();
+        });
+    });
+
+    QUnit.module('DrillDowner Controls', function() {
+        QUnit.test('Controls render with breadcrumbs', function(assert) {
+            const container = '#test-container';
+            const controls = '#test-controls';
+            $(container).empty();
+            $(controls).empty();
+
+            const drillDowner = new DrillDowner(container, testData, {
+                groupOrder: ["p", "c", "w"],
+                columns: ["status"],
+                totals: ["rolls"],
+                colProperties: testColProperties,
+                controlsSelector: controls
+            });
+
+            const $breadcrumbs = $(controls).find('.drillDowner_breadcrumb_item');
+            assert.equal($breadcrumbs.length, 3, 'Three breadcrumb items for three group levels');
+
+            const $arrows = $(controls).find('.drillDowner_breadcrumb_arrow');
+            assert.equal($arrows.length, 2, 'Two arrows between three levels');
+
+            drillDowner.destroy();
+        });
+
+        QUnit.test('Breadcrumb clicks work', function(assert) {
+            const container = '#test-container';
+            const controls = '#test-controls';
+            $(container).empty();
+            $(controls).empty();
+
+            const drillDowner = new DrillDowner(container, testData, {
+                groupOrder: ["p", "c", "w"],
+                columns: ["status"],
+                totals: ["rolls"],
+                controlsSelector: controls
+            });
+
+            // Click on level 1 breadcrumb
+            const $level1Breadcrumb = $(controls).find('.drillDowner_breadcrumb_item[data-level="1"]');
+            assert.ok($level1Breadcrumb.length > 0, 'Level 1 breadcrumb found');
+
+            $level1Breadcrumb.click();
+
+            // Check if view expanded to level 1
+            const visibleRows = $(container).find('tbody tr:visible').length;
+            const level0And1Rows = $(container).find('tr[data-level="0"], tr[data-level="1"]').length;
+            assert.ok(visibleRows >= level0And1Rows, 'Breadcrumb click expanded view');
+
+            drillDowner.destroy();
+        });
+
+        QUnit.test('Group order selector works', function(assert) {
+            const container = '#test-container';
+            const controls = '#test-controls';
+            $(container).empty();
+            $(controls).empty();
+
+            const drillDowner = new DrillDowner(container, testData, {
+                groupOrder: ["p", "c", "w"],
+                columns: ["status"],
+                totals: ["rolls"],
+                colProperties: testColProperties,
+                controlsSelector: controls
+            });
+
+            const $select = $(controls).find('select');
+            if ($select.length > 0) {
+                // Change to a different grouping order
+                $select.val('1,0,2').trigger('change');
+
+                // Verify the order changed
+                assert.deepEqual(drillDowner.options.groupOrder, ['c', 'p', 'w'], 'Group order changed correctly');
+            } else {
+                assert.ok(true, 'No group selector (acceptable for some configurations)');
+            }
+
+            drillDowner.destroy();
+        });
+    });
+
+    QUnit.module('DrillDowner AZ Bar', function() {
+        QUnit.test('AZ bar renders correctly', function(assert) {
+            const container = '#test-container';
+            const azbar = '#test-azbar';
+            $(container).empty();
+            $(azbar).empty();
+
+            const drillDowner = new DrillDowner(container, testData, {
+                groupOrder: ["p"],
+                columns: ["status"],
+                totals: ["rolls"],
+                azBarSelector: azbar
+            });
+
+            const $azLinks = $(azbar).find('.drillDowner_az_link');
+            const $azDimmed = $(azbar).find('.drillDowner_az_dimmed');
+
+            assert.ok($azLinks.length > 0, 'Active AZ links found');
+            assert.ok($azDimmed.length > 0, 'Dimmed AZ letters found');
+            assert.equal($azLinks.length + $azDimmed.length, 26, 'All 26 letters present');
+
+            drillDowner.destroy();
+        });
+
+        QUnit.test('AZ bar shows correct active letters', function(assert) {
+            const container = '#test-container';
+            const azbar = '#test-azbar';
+            $(container).empty();
+            $(azbar).empty();
+
+            const drillDowner = new DrillDowner(container, testData, {
+                groupOrder: ["p"],
+                columns: ["status"],
+                totals: ["rolls"],
+                azBarSelector: azbar
+            });
+
+            // Check that letters corresponding to our test data are active
+            const expectedActiveLetters = ['A', 'B', 'D', 'G', 'Z']; // Alpha, Beta, Delta, Gamma, Zeta
+
+            expectedActiveLetters.forEach(letter => {
+                const $link = $(azbar).find(`.drillDowner_az_link:contains(${letter})`);
+                assert.ok($link.length > 0, `Letter ${letter} is active in AZ bar`);
+            });
+
+            drillDowner.destroy();
+        });
+    });
+
+    QUnit.module('DrillDowner Column Properties', function() {
+        QUnit.test('Column labels are applied correctly', function(assert) {
+            const container = '#test-container';
+            $(container).empty();
+
+            const drillDowner = new DrillDowner(container, testData, {
+                groupOrder: ["p"],
+                columns: ["status"],
+                totals: ["rolls"],
+                colProperties: testColProperties,
+                showGrandTotals: false // Disable grand totals for cleaner header text testing
+            });
+
+            const $headers = $(container).find('thead th');
+            const headerTexts = $headers.map((i, el) => $(el).text()).get();
+
+            assert.ok(headerTexts.includes('Rollos'), 'Custom label for rolls column applied');
+            assert.ok(headerTexts.includes('Estado'), 'Custom label for status column applied');
+
+            drillDowner.destroy();
+        });
+
+        QUnit.test('Column labels work correctly with grand totals enabled', function(assert) {
+            const container = '#test-container';
+            $(container).empty();
+
+            const drillDowner = new DrillDowner(container, testData, {
+                groupOrder: ["p"],
+                columns: ["status"],
+                totals: ["rolls"],
+                colProperties: testColProperties,
+                showGrandTotals: true // Enable grand totals
+            });
+
+            const $headers = $(container).find('thead th');
+
+            // Check HTML content instead of text content for grand totals case
+            let foundRollsLabel = false;
+            let foundStatusLabel = false;
+
+            $headers.each(function() {
+                const headerHTML = $(this).html();
+                if (headerHTML.includes('Rollos')) {
+                    foundRollsLabel = true;
+                }
+                if (headerHTML.includes('Estado')) {
+                    foundStatusLabel = true;
+                }
+            });
+
+            assert.ok(foundRollsLabel, 'Custom label for rolls column applied with grand totals');
+            assert.ok(foundStatusLabel, 'Custom label for status column applied with grand totals');
+
+            drillDowner.destroy();
+        });
+
+        QUnit.test('Column formatters work correctly', function(assert) {
+            const container = '#test-container';
+            $(container).empty();
+
+            const drillDowner = new DrillDowner(container, testData, {
+                groupOrder: ["p", "c"],
+                columns: ["status", "priority"],
+                totals: [],
+                colProperties: testColProperties
+            });
+
+            drillDowner.expandAll();
+
+            // Check for formatted status values
+            const $statusCells = $(container).find('tbody tr[data-level="1"] td').filter(function() {
+                return $(this).text().includes('⏳') || $(this).text().includes('🔄') || $(this).text().includes('✅');
+            });
+            assert.ok($statusCells.length > 0, 'Status formatter applied correctly');
+
+            // Check for formatted priority values (stars)
+            const $priorityCells = $(container).find('tbody tr[data-level="1"] td').filter(function() {
+                return $(this).text().includes('★');
+            });
+            assert.ok($priorityCells.length > 0, 'Priority formatter applied correctly');
+
+            drillDowner.destroy();
+        });
+
+        QUnit.test('togglesUp property works correctly', function(assert) {
+            const container = '#test-container';
+            $(container).empty();
+
+            const drillDowner = new DrillDowner(container, testData, {
+                groupOrder: ["p"],
+                columns: ["unidades", "slow"],
+                totals: [],
+                colProperties: testColProperties
+            });
+
+            // Check that togglesUp columns show combined values
+            const $unidadesCells = $(container).find('tbody td').filter(function() {
+                const text = $(this).text();
+                return text.includes('Kg') || text.includes('m');
+            });
+            assert.ok($unidadesCells.length > 0, 'togglesUp columns show aggregated values');
+
+            drillDowner.destroy();
+        });
+    });
+
+    QUnit.module('DrillDowner Edge Cases', function() {
+        QUnit.test('Handles invalid collapse levels', function(assert) {
+            const container = '#test-container';
+            $(container).empty();
+
+            const drillDowner = new DrillDowner(container, testData, {
+                groupOrder: ["p", "c"],
+                columns: ["status"],
+                totals: ["rolls"]
+            });
+
+            // Test negative level
+            drillDowner.collapseToLevel(-1);
+            let visibleRows = $(container).find('tbody tr:visible').length;
+            let level0Rows = $(container).find('tr[data-level="0"]').length;
+            assert.equal(visibleRows, level0Rows, 'Negative level defaults to 0');
+
+            // Test level beyond available
+            drillDowner.collapseToLevel(10);
+            const allRows = $(container).find('tbody tr').length;
+            visibleRows = $(container).find('tbody tr:visible').length;
+            assert.equal(visibleRows, allRows, 'Excessive level shows all rows');
+
+            // Test null/undefined level
+            drillDowner.collapseToLevel(null);
+            visibleRows = $(container).find('tbody tr:visible').length;
+            level0Rows = $(container).find('tr[data-level="0"]').length;
+            assert.equal(visibleRows, level0Rows, 'Null level defaults to 0');
+
+            drillDowner.destroy();
+        });
+
+        QUnit.test('Handles missing column properties gracefully', function(assert) {
+            const container = '#test-container';
+            $(container).empty();
+
+            const drillDowner = new DrillDowner(container, testData, {
+                groupOrder: ["nonexistent"],
+                columns: ["alsononexistent"],
+                totals: ["rolls"]
+            });
+
+            assert.ok(drillDowner instanceof DrillDowner, 'DrillDowner handles missing columns');
+            assert.ok($(container).find('table.drillDowner_table').length > 0, 'Table still renders');
+
+            drillDowner.destroy();
+        });
+
+        QUnit.test('Destroy method cleans up properly', function(assert) {
+            const container = '#test-container';
+            const controls = '#test-controls';
+            const azbar = '#test-azbar';
+
+            $(container).empty();
+            $(controls).empty();
+            $(azbar).empty();
+
+            const drillDowner = new DrillDowner(container, testData, {
+                groupOrder: ["p", "c"],
+                columns: ["status"],
+                totals: ["rolls"],
+                controlsSelector: controls,
+                azBarSelector: azbar
+            });
+
+            // Verify elements exist before destroy
+            assert.ok($(container).find('table').length > 0, 'Table exists before destroy');
+            assert.ok($(controls).children().length > 0, 'Controls exist before destroy');
+            assert.ok($(azbar).children().length > 0, 'AZ bar exists before destroy');
+
+            drillDowner.destroy();
+
+            // Verify cleanup
+            assert.equal($(container).children().length, 0, 'Container is empty after destroy');
+            assert.equal($(controls).children().length, 0, 'Controls are empty after destroy');
+            assert.equal($(azbar).children().length, 0, 'AZ bar is empty after destroy');
+        });
+    });
+
+    QUnit.module('DrillDowner Static Methods', function() {
+        QUnit.test('formatNumber works correctly', function(assert) {
+            assert.equal(DrillDowner.formatNumber(1234.567, 2), '1,234.57', 'Number formatted with 2 decimals');
+            assert.equal(DrillDowner.formatNumber(1000, 0), '1,000', 'Number formatted with 0 decimals');
+            assert.equal(DrillDowner.formatNumber('invalid', 2), 'invalid', 'Invalid number returned as-is');
+            assert.equal(DrillDowner.formatNumber(0, 1), '0.0', 'Zero formatted correctly');
+        });
+    });
+
+    QUnit.module('DrillDowner Performance', function() {
+        QUnit.test('Handles large datasets reasonably', function(assert) {
+            const container = '#test-container';
+            $(container).empty();
+
+            // Create a larger dataset
+            const largeData = [];
+            for (let i = 0; i < 100; i++) {
+                largeData.push({
+                    p: `Product${i % 10}`,
+                    c: `Color${i % 5}`,
+                    w: `Warehouse${i % 3}`,
+                    rolls: Math.floor(Math.random() * 100),
+                    quantity: Math.floor(Math.random() * 1000),
+                    status: ['pending', 'active', 'completed'][i % 3]
+                });
+            }
+
+            const startTime = performance.now();
+            const drillDowner = new DrillDowner(container, largeData, {
+                groupOrder: ["p", "c", "w"],
+                columns: ["status"],
+                totals: ["rolls", "quantity"]
+            });
+            const endTime = performance.now();
+
+            const renderTime = endTime - startTime;
+            assert.ok(renderTime < 5000, `Rendering completed in reasonable time: ${renderTime}ms`);
+            assert.ok($(container).find('table.drillDowner_table').length > 0, 'Table rendered with large dataset');
+
+            drillDowner.destroy();
+        });
+    });
+
+    QUnit.module('DrillDowner Grouping Combinations', function() {
+        QUnit.test('Custom groupOrderCombinations work', function(assert) {
+            const container = '#test-container';
+            const controls = '#test-controls';
+            $(container).empty();
+            $(controls).empty();
+
+            const customCombinations = [
+                ["p", "c", "w"],
+                ["w", "p", "c"],
+                ["c", "w", "p"]
+            ];
+
+            const drillDowner = new DrillDowner(container, testData, {
+                groupOrder: ["p", "c", "w"],
+                groupOrderCombinations: customCombinations,
+                columns: ["status"],
+                totals: ["rolls"],
+                colProperties: testColProperties,
+                controlsSelector: controls
+            });
+
+            const $select = $(controls).find('select');
+            if ($select.length > 0) {
+                const optionCount = $select.find('option').length;
+                assert.equal(optionCount, 3, 'Correct number of custom combinations in select');
+
+                // Test changing combination
+                $select.val('1').trigger('change');
+                assert.deepEqual(drillDowner.options.groupOrder, ["w", "p", "c"], 'Custom combination applied correctly');
+            }
+
+            drillDowner.destroy();
+        });
+    });
+
+    QUnit.module('DrillDowner Grand Totals', function() {
+        QUnit.test('Grand totals are calculated correctly for simple totals', function(assert) {
+            const container = '#test-container';
+            $(container).empty();
+
+            const drillDowner = new DrillDowner(container, testData, {
+                groupOrder: ["p"],
+                columns: ["status"],
+                totals: ["rolls"],
+                colProperties: testColProperties,
+                showGrandTotals: true
+            });
+
+            // Check that grand totals object exists and has correct values
+            assert.ok(drillDowner.grandTotals, 'Grand totals object exists');
+            assert.ok(drillDowner.grandTotals.hasOwnProperty('rolls'), 'Grand totals contains rolls');
+
+            // Calculate expected total manually
+            const expectedRollsTotal = testData.reduce((sum, row) => sum + (row.rolls || 0), 0);
+            assert.equal(drillDowner.grandTotals.rolls, expectedRollsTotal, 'Grand total for rolls is correct');
+
+            drillDowner.destroy();
+        });
+
+        QUnit.test('Grand totals are calculated correctly for subTotalBy columns', function(assert) {
+            const container = '#test-container';
+            $(container).empty();
+
+            const drillDowner = new DrillDowner(container, testData, {
+                groupOrder: ["p"],
+                columns: ["status"],
+                totals: ["quantity"],
+                colProperties: testColProperties,
+                showGrandTotals: true
+            });
+
+            // Check that grand totals for subTotalBy columns are objects
+            assert.ok(drillDowner.grandTotals.quantity, 'Grand totals contains quantity');
+            assert.equal(typeof drillDowner.grandTotals.quantity, 'object', 'Quantity grand total is an object (subtotals)');
+
+            // Check that it has the expected unit keys
+            assert.ok(drillDowner.grandTotals.quantity.hasOwnProperty('Kg'), 'Grand totals has Kg subtotal');
+            assert.ok(drillDowner.grandTotals.quantity.hasOwnProperty('m'), 'Grand totals has m subtotal');
+
+            // Calculate expected subtotals manually
+            const expectedKgTotal = testData.filter(row => row.unidades === 'Kg').reduce((sum, row) => sum + (row.quantity || 0), 0);
+            const expectedMTotal = testData.filter(row => row.unidades === 'm').reduce((sum, row) => sum + (row.quantity || 0), 0);
+
+            assert.equal(drillDowner.grandTotals.quantity.Kg, expectedKgTotal, 'Kg subtotal is correct');
+            assert.equal(drillDowner.grandTotals.quantity.m, expectedMTotal, 'm subtotal is correct');
+
+            drillDowner.destroy();
+        });
+
+        QUnit.test('Table header shows grand totals when enabled', function(assert) {
+            const container = '#test-container';
+            $(container).empty();
+
+            const drillDowner = new DrillDowner(container, testData, {
+                groupOrder: ["p"],
+                columns: ["status"],
+                totals: ["rolls", "quantity"],
+                colProperties: testColProperties,
+                showGrandTotals: true
+            });
+
+            const $table = $(container).find('table.drillDowner_table');
+            const $headers = $table.find('thead th');
+
+            // Check that headers contain grand total information
+            let foundRollsGrandTotal = false;
+            let foundQuantityGrandTotal = false;
+
+            $headers.each(function() {
+                const headerHTML = $(this).html();
+                if (headerHTML.includes('Rollos') && headerHTML.includes('<small>')) {
+                    foundRollsGrandTotal = true;
+                }
+                if (headerHTML.includes('Cantidad') && headerHTML.includes('<small>')) {
+                    foundQuantityGrandTotal = true;
+                }
+            });
+
+            assert.ok(foundRollsGrandTotal, 'Rolls header contains grand total');
+            assert.ok(foundQuantityGrandTotal, 'Quantity header contains grand total');
+
+            drillDowner.destroy();
+        });
+
+        QUnit.test('Table footer (tfoot) is created when grand totals are enabled', function(assert) {
+            const container = '#test-container';
+            $(container).empty();
+
+            const drillDowner = new DrillDowner(container, testData, {
+                groupOrder: ["p"],
+                columns: ["status"],
+                totals: ["rolls", "quantity"],
+                colProperties: testColProperties,
+                showGrandTotals: true
+            });
+
+            const $table = $(container).find('table.drillDowner_table');
+            const $tfoot = $table.find('tfoot');
+
+            assert.ok($tfoot.length > 0, 'Table footer exists when grand totals enabled');
+
+            const $tfootRow = $tfoot.find('tr');
+            assert.ok($tfootRow.length > 0, 'Footer row exists');
+
+            const $tfootCells = $tfootRow.find('td');
+            assert.ok($tfootCells.length > 0, 'Footer cells exist');
+
+            // Check that first cell says "Total"
+            const firstCellText = $tfootCells.first().text();
+            assert.ok(firstCellText.includes('Total'), 'First footer cell contains "Total"');
+
+            drillDowner.destroy();
+        });
+
+        QUnit.test('Table footer is not created when grand totals are disabled', function(assert) {
+            const container = '#test-container';
+            $(container).empty();
+
+            const drillDowner = new DrillDowner(container, testData, {
+                groupOrder: ["p"],
+                columns: ["status"],
+                totals: ["rolls"],
+                colProperties: testColProperties,
+                showGrandTotals: false
+            });
+
+            const $table = $(container).find('table.drillDowner_table');
+            const $tfoot = $table.find('tfoot');
+
+            assert.equal($tfoot.length, 0, 'Table footer does not exist when grand totals disabled');
+
+            drillDowner.destroy();
+        });
+
+        QUnit.test('Grand totals are recalculated when data changes', function(assert) {
+            const container = '#test-container';
+            $(container).empty();
+
+            const drillDowner = new DrillDowner(container, testData, {
+                groupOrder: ["p"],
+                columns: ["status"],
+                totals: ["rolls"],
+                colProperties: testColProperties,
+                showGrandTotals: true
+            });
+
+            const originalGrandTotal = drillDowner.grandTotals.rolls;
+
+            // Modify the data
+            drillDowner.dataArr = testData.slice(0, 5); // Use only first 5 items
+
+            // Re-render
+            drillDowner.render();
+
+            const newGrandTotal = drillDowner.grandTotals.rolls;
+
+            assert.notEqual(originalGrandTotal, newGrandTotal, 'Grand total changed after data modification');
+            assert.ok(newGrandTotal < originalGrandTotal, 'New grand total is smaller (fewer items)');
+
+            drillDowner.destroy();
+        });
+
+        QUnit.test('Grand total formatting works correctly', function(assert) {
+            const container = '#test-container';
+            $(container).empty();
+
+            const drillDowner = new DrillDowner(container, testData, {
+                groupOrder: ["p"],
+                columns: [],
+                totals: ["rolls", "quantity"],
+                colProperties: testColProperties,
+                showGrandTotals: true
+            });
+
+            // Test simple total formatting
+            const rollsFormatted = drillDowner._formatGrandTotal('rolls');
+            assert.ok(typeof rollsFormatted === 'string', 'Formatted grand total is a string');
+            assert.ok(!isNaN(parseFloat(rollsFormatted.replace(/,/g, ''))), 'Formatted total contains a valid number');
+
+            // Test subTotalBy formatting
+            const quantityFormatted = drillDowner._formatGrandTotal('quantity');
+            assert.ok(typeof quantityFormatted === 'string', 'Formatted subtotal is a string');
+            assert.ok(quantityFormatted.includes('Kg') || quantityFormatted.includes('m'), 'Subtotal formatting includes units');
+
+            drillDowner.destroy();
+        });
+
+        QUnit.test('Grand totals work correctly with empty data', function(assert) {
+            const container = '#test-container';
+            $(container).empty();
+
+            const drillDowner = new DrillDowner(container, [], {
+                groupOrder: ["p"],
+                columns: ["status"],
+                totals: ["rolls"],
+                colProperties: testColProperties,
+                showGrandTotals: true
+            });
+
+            assert.ok(drillDowner.grandTotals, 'Grand totals object exists with empty data');
+            assert.equal(drillDowner.grandTotals.rolls, 0, 'Grand total is 0 for empty data');
+
+            const $table = $(container).find('table.drillDowner_table');
+            const $tfoot = $table.find('tfoot');
+            assert.ok($tfoot.length > 0, 'Footer still created with empty data');
+
+            drillDowner.destroy();
+        });
+
+        QUnit.test('Multiple totals columns all get grand totals', function(assert) {
+            const container = '#test-container';
+            $(container).empty();
+
+            const drillDowner = new DrillDowner(container, testData, {
+                groupOrder: ["p"],
+                columns: [],
+                totals: ["rolls", "quantity", "priority"],
+                colProperties: testColProperties,
+                showGrandTotals: true
+            });
+
+            // Check that all totals columns have grand totals
+            assert.ok(drillDowner.grandTotals.hasOwnProperty('rolls'), 'Rolls grand total exists');
+            assert.ok(drillDowner.grandTotals.hasOwnProperty('quantity'), 'Quantity grand total exists');
+            assert.ok(drillDowner.grandTotals.hasOwnProperty('priority'), 'Priority grand total exists');
+
+            // Check footer has correct number of total cells
+            const $table = $(container).find('table.drillDowner_table');
+            const $footerCells = $table.find('tfoot td');
+
+            // Should have: Item column + 3 total columns = 4 cells
+            assert.equal($footerCells.length, 4, 'Footer has correct number of cells for multiple totals');
+
+            drillDowner.destroy();
+        });
+
+        QUnit.test('Grand totals CSS classes are applied correctly', function(assert) {
+            const container = '#test-container';
+            $(container).empty();
+
+            const drillDowner = new DrillDowner(container, testData, {
+                groupOrder: ["p"],
+                columns: [],
+                totals: ["rolls"],
+                colProperties: testColProperties,
+                showGrandTotals: true
+            });
+
+            const $table = $(container).find('table.drillDowner_table');
+
+            // Check header classes
+            const $headerWithTotal = $table.find('thead th').filter(function() {
+                return $(this).html().includes('<small>');
+            });
+            assert.ok($headerWithTotal.hasClass('drillDownerThTotal'), 'Header with grand total has correct CSS class');
+
+            // Check footer classes
+            const $footerTotalCells = $table.find('tfoot td.drillDownerTfootTotal');
+            assert.ok($footerTotalCells.length > 0, 'Footer total cells have correct CSS class');
+
+            drillDowner.destroy();
+        });
+    });
+
+    // Start QUnit
+    QUnit.start();
+</script>
+</body>
+</html>

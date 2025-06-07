@@ -1,0 +1,71 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/**'          # Only build when source files change
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+  workflow_dispatch:      # Allow manual trigger from GitHub UI
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create dist directory
+        run: mkdir -p dist
+
+      - name: Build minified JavaScript with source map
+        run: npx terser src/DrillDowner.js -o dist/DrillDowner.min.js --source-map --source-map-url DrillDowner.min.js.map --compress --mangle
+
+      - name: Build minified CSS with source map
+        run: npx clean-css-cli src/drilldowner.css -o dist/drilldowner.min.css --source-map
+
+      - name: Verify build files
+        run: |
+          echo "Built files:"
+          ls -la dist/
+          echo "JavaScript file size:"
+          wc -c dist/DrillDowner.min.js
+          echo "CSS file size:"
+          wc -c dist/drilldowner.min.css
+
+      - name: Commit and push built files
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add dist/
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "🤖 Auto-build: Update dist files [skip ci]"
+            git push
+          fi
+
+      - name: Upload build artifacts
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: dist/
+          retention-days: 7

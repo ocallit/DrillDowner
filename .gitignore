@@ -1,0 +1,15 @@
+.idea/
+.vscode/
+*.swp                 # Vim
+*.swo                 # Vim
+*~                    # Emacs
+.DS_Store             # macOS Finder
+Thumbs.db             # Windows Explorer
+
+dist/
+
+node_modules/
+
+yarn.lock
+
+
