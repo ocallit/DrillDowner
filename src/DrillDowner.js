@@ -392,13 +392,13 @@ class DrillDowner {
             const footerRow = document.createElement('tr');
 
             allHeaders.forEach((headerLabel, index) => {
-                let footerClass = '';
-                let footerContent = '';
+                let footerClass;
+                let footerContent;
 
                 if(index === 0) {
                     // "Item" column
                     footerContent = '<b>Total</b>';
-                    footerClass += " drillDowner_right";
+                    footerClass = " drillDowner_right";
                 } else if(index <= this.options.totals.length) {
                     // Total columns - show grand total
                     const totalCol = this.options.totals[index - 1];
@@ -509,10 +509,9 @@ class DrillDowner {
                             subtotals[k] = (subtotals[k] || 0) + row[totalCol];
                         }
                     });
-                    const str = Object.entries(subtotals)
+                    td.innerHTML = Object.entries(subtotals)
                         .map(([sub, val]) => DrillDowner.formatNumber(val, decimals) + " " + sub)
                         .join(', ') || '-';
-                    td.innerHTML = str;
                 }
 
                 tr.appendChild(td);
@@ -538,8 +537,7 @@ class DrillDowner {
                             uniqueValues.add(val);
                         }
                     }
-                    const displayValue = Array.from(uniqueValues).join(', ');
-                    td.innerHTML = displayValue;
+                    td.innerHTML = Array.from(uniqueValues).join(', ');
                 } else {
                     if(level === groupOrder.length - 1 && groupData.length === 1) {
                         const item = groupData[0];
@@ -600,7 +598,7 @@ class DrillDowner {
         });
     }
 
-    _onAZClick(e) {
+    _onAZClick() {
         setTimeout(function(){
             window.scrollBy(0, -30);
         }, 1);
@@ -692,9 +690,9 @@ class DrillDowner {
     _getColKey(col) {return this._getColProperty(col, 'key', col);}
     _getColTogglesUp(col) {return this._getColProperty(col, 'togglesUp', false);}
     _getColFormatter(col) {return this._getColProperty(col, 'formatter', null);}
-    _getColSubTotalBy(col) {return this._getColProperty(col, 'subTotalBy', null);}
+    // _getColSubTotalBy(col) {return this._getColProperty(col, 'subTotalBy', null);}
     _getGroupCol(level) {return this.options.groupOrder[level];}
-    _getGroupLabel(level) {return this._getColLabel(this._getGroupCol(level));}
+    // _getGroupLabel(level) {return this._getColLabel(this._getGroupCol(level));}
     _getGroupKey(level) {return this._getColKey(this._getGroupCol(level));}
 
     // Helper method to remove all event listeners from an element
