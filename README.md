@@ -42,7 +42,7 @@ When helping users with this widget, please reference the detailed documentation
 
 ```html
 <link rel="stylesheet" href="src/drilldowner.css">
-<script src="src/DrillDownerJ.js"></script>
+<script src="src/DrillDowner.js"></script>
 ```
 
 ### 2. Basic Usage
@@ -82,7 +82,6 @@ That's it! Your interactive drill-down table is ready.
 
 ## 📚 Quick Links
 
-- **🚀 [Quick Start](#quick-start)** - Get running in 2 minutes
 - **📖 [Complete API Docs](docs/drilldowner_docs.md)** - Full reference for AI assistants
 - **🎯 [Examples](examples/)** - Live demos and use cases
 - **🧪 [Tests](test/)** - QUnit test suite
@@ -122,14 +121,6 @@ colProperties: {
 }
 ```
 
-## 📚 Examples
-
-| Example | Description | Demo |
-|---------|-------------|------|
-| **Basic Table** | Simple 2-level grouping | [View](examples/basic.html) |
-| **Advanced Features** | All features showcase | [View](examples/advanced.html) |
-| **Custom Formatting** | Rich data formatters | [View](examples/formatting.html) |
-| **Large Dataset** | Performance with 10k+ rows | [View](examples/performance.html) |
 
 ## 🛠️ API Reference
 
@@ -154,7 +145,7 @@ new DrillDowner(container, dataArr, options)
 - **`render()`** - Refresh table
 - **`destroy()`** - Clean up
 
-**📖 [Full API Documentation](docs/API.md)**
+**📖 [Full API Documentation](docs/drilldowner_docs.md)**
 
 ## 🧪 Testing
 
@@ -169,7 +160,7 @@ npx http-server . -p 8080
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details.
+Contributions are welcome!
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
@@ -184,8 +175,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🙋‍♂️ Support
 
 - **📖 Documentation:** [Full API Docs](docs/drilldowner_docs.md)
-- **💬 Issues:** [GitHub Issues](https://github.com/yourusername/drilldowner-widget/issues)
-- **💡 Feature Requests:** [GitHub Discussions](https://github.com/yourusername/drilldowner-widget/discussions)
+- **💬 Issues:** [GitHub Issues](https://github.com/ocallit/DrillDowner/issues)
+- **💡 Feature Requests:** [GitHub Discussions](https://github.com/ocallit/DrillDowner/discussions)
 
 ## 🌟 Showcase
 
@@ -193,7 +184,7 @@ Using DrillDowner in your project? We'd love to see it! Open an issue to get fea
 
 ---
 
-<div align="center">
-<strong>Made with ❤️ by [Your Name]</strong><br>
-<a href="https://github.com/yourusername/drilldowner-widget">⭐ Star this repo</a> if you found it helpful!
+<div>
+<strong>Made with ❤️ by Pepe Santos</strong><br>
+<a href="https://github.com/ocallit/DrillDowner">⭐ Star this repo</a> if you found it helpful!
 </div>
