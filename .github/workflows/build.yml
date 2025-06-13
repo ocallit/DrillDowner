@@ -40,6 +40,9 @@ jobs:
       - name: Create dist directory
         run: mkdir -p dist
 
+      - name: Update local branch with remote changes
+        run: git pull --rebase origin main
+        
       - name: Build minified JavaScript with source map
         run: npx terser src/DrillDowner.js -o dist/DrillDowner.min.js --source-map --source-map-url DrillDowner.min.js.map --compress --mangle
 
