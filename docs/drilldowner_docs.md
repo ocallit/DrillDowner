@@ -10,17 +10,18 @@ DrillDowner is a powerful ES6 JavaScript class that creates interactive, hierarc
 Creates a new DrillDowner instance and immediately renders it.
 
 **Parameters:**
-- `container` (string|jQuery) - CSS selector or jQuery object for the main table container
+- `container` (string|DOM) - CSS selector or DOM object for the main table container
 - `dataArr` (Array) - Array of data objects to display
 - `options` (Object) - Configuration options (see Options section)
 
 **Example:**
+
 ```javascript
 const drillDowner = new DrillDowner('#my-table', data, {
     groupOrder: ["category", "subcategory"],
     columns: ["name", "status"],
     totals: ["amount"],
-    colProperties: { /* column configurations */ }
+    colProperties: { /* column configurations */}
 });
 ```
 
@@ -250,11 +251,12 @@ Define behavior and appearance for each column:
 ## Usage Examples
 
 ### Basic Setup
+
 ```javascript
 const data = [
-    { category: "Electronics", product: "Phone", quantity: 10, price: 599.99 },
-    { category: "Electronics", product: "Laptop", quantity: 5, price: 1299.99 },
-    { category: "Books", product: "Novel", quantity: 25, price: 19.99 }
+    {category: "Electronics", product: "Phone", quantity: 10, price: 599.99},
+    {category: "Electronics", product: "Laptop", quantity: 5, price: 1299.99},
+    {category: "Books", product: "Novel", quantity: 25, price: 19.99}
 ];
 
 const drillDowner = new DrillDowner('#table-container', data, {
@@ -262,15 +264,16 @@ const drillDowner = new DrillDowner('#table-container', data, {
     columns: ["quantity"],
     totals: ["price"],
     colProperties: {
-        category: { label: "Category", icon: "📁" },
-        product: { label: "Product Name" },
-        quantity: { label: "Qty", decimals: 0 },
-        price: { label: "Price ($)", decimals: 2, class: "money" }
+        category: {label: "Category", icon: "📁"},
+        product: {label: "Product Name"},
+        quantity: {label: "Qty", decimals: 0},
+        price: {label: "Price ($)", decimals: 2, class: "money"}
     }
 });
 ```
 
 ### With Custom Formatting
+
 ```javascript
 const drillDowner = new DrillDowner('#table', data, {
     groupOrder: ["department", "employee"],
@@ -281,7 +284,7 @@ const drillDowner = new DrillDowner('#table', data, {
             label: "Status",
             togglesUp: true,
             formatter: (value) => {
-                const icons = { active: "🟢", inactive: "🔴", pending: "🟡" };
+                const icons = {active: "🟢", inactive: "🔴", pending: "🟡"};
                 return `${icons[value] || "⚫"} ${value}`;
             }
         },

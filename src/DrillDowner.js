@@ -1,6 +1,7 @@
 class DrillDowner {
     constructor(container, dataArr, options = {}) {
-        this.$container = $(container);
+        // Handle container as either DOM element or selector string
+        this.container = typeof container === 'string' ? document.querySelector(container) : container;
         this.dataArr = dataArr;
         this.options = Object.assign({
             columns: [],
@@ -13,11 +14,14 @@ class DrillDowner {
             controlsSelector: null,
             showGrandTotals: true, // New option to control grand totals display
         }, options);
-        this.totals = this.options.totals || [];
-        this.columns = this.options.columns || [];
-        this.colProperties = this.options.colProperties || {};
-        this.$azBar = this.options.azBarSelector ? $(this.options.azBarSelector) : null;
-        this.$controls = this.options.controlsSelector ? $(this.options.controlsSelector) : null;
+        this.options.totals = this.options.totals || [];
+        this.options.columns = this.options.columns || [];
+        this.options.colProperties = this.options.colProperties || {};
+
+        this.azBar = this.options.azBarSelector ? (typeof this.options.azBarSelector === 'string' ? 
+            document.querySelector(this.options.azBarSelector) : this.options.azBarSelector) : null;
+        this.controls = this.options.controlsSelector ? (typeof this.options.controlsSelector === 'string' ? 
+            document.querySelector(this.options.controlsSelector) : this.options.controlsSelector) : null;
         this._natSort = new Intl.Collator('es-MX', {
             sensitivity: 'base',   // case & accent insensitive
             numeric: true,         // "2" < "10"
@@ -25,15 +29,10 @@ class DrillDowner {
         }).compare;
         // Calculate grand totals
         this.grandTotals = this._calculateGrandTotals();
-
         this._onDrillClick = this._onDrillClick.bind(this);
         this._onAZClick = this._onAZClick.bind(this);
-
         this.render();
     }
-
-
-
 
     // ---------- Public Methods ----------
     collapseToLevel(level = 0) {
@@ -42,44 +41,60 @@ class DrillDowner {
         if(level >= this.options.groupOrder.length)
             level = this.options.groupOrder.length - 1;
 
-        const $table = this.$container.find('table.drillDowner_table');
-        $table.find('tbody tr').each((_, tr) => {
-            const $row = $(tr);
-            const lvl = +$row.attr('data-level');
-            if(lvl > level) $row.hide();
-            else $row.show();
-            $row.find('.drillDowner_drill_icon')
-                .removeClass('drillDowner_drill_expanded')
-                .addClass('drillDowner_drill_collapsed');
+        const table = this.container.querySelector('table.drillDowner_table');
+        const rows = table.querySelectorAll('tbody tr');
+        rows.forEach(row => {
+            const lvl = +row.getAttribute('data-level');
+            if(lvl > level) row.style.display = 'none';
+            else row.style.display = '';
+
+            const drillIcons = row.querySelectorAll('.drillDowner_drill_icon');
+            drillIcons.forEach(icon => {
+                icon.classList.remove('drillDowner_drill_expanded');
+                icon.classList.add('drillDowner_drill_collapsed');
+            });
         });
         this._updateBreadcrumbArrows(level);
+        return this;
     }
 
-    collapseAll() { this.collapseToLevel(0); }
+    collapseAll() { this.collapseToLevel(0); return this;}
 
-    expandAll() { this.collapseToLevel(this.options.groupOrder.length - 1); }
+    expandAll() { this.collapseToLevel(this.options.groupOrder.length - 1); return this;}
 
     changeGroupOrder(newOrder) {
         this.options.groupOrder = newOrder;
         this.render();
+        return this;
     }
 
     destroy() {
-        if(this.$controls) {
-            this.$controls.off();
-            this.$controls.empty();
+        if(this.controls) {
+            this.controls = this._removeAllEventListeners(this.controls);
+            this.controls.innerHTML = '';
         }
-        if(this.$azBar) {
-            this.$azBar.off();
-            this.$azBar.empty();
+        if(this.azBar) {
+            this.azBar = this._removeAllEventListeners(this.azBar);
+            this.azBar.innerHTML = '';
         }
-        if(this.$table) this.$table.off();
-        this.$container.empty();
+        if(this.table) this.table = this._removeAllEventListeners(this.table);
+        this.container.innerHTML = '';
     }
 
     render() {
         // Recalculate grand totals when rendering (in case data changed)
         this.grandTotals = this._calculateGrandTotals();
+
+        // Clean up existing elements and their event listeners before rendering
+        if(this.controls) {
+            this.controls = this._removeAllEventListeners(this.controls);
+        }
+        if(this.azBar) {
+            this.azBar = this._removeAllEventListeners(this.azBar);
+        }
+        if(this.table) {
+            this.table = this._removeAllEventListeners(this.table);
+        }
 
         this._renderControls();
         this._renderAZBar();
@@ -87,11 +102,11 @@ class DrillDowner {
         this.collapseToLevel(0);
     }
 
-    getTable() { return this.$container.find('table.drillDowner_table'); }
+    getTable() { return this.container.querySelector('table.drillDowner_table'); }
 
     // ---------- Rendering ----------
     _renderControls() {
-        if(!this.$controls) return;
+        if(!this.controls) return;
         const idPrefix = this.options.idPrefix;
 
         const breadcrumbElements = [];
@@ -101,7 +116,7 @@ class DrillDowner {
             const icon = this._getGroupIcon(col);
 
             breadcrumbElements.push(`
-            <button type="button"  class="drillDowner_breadcrumb_item" data-level="${index}">
+            <button type="button" class="drillDowner_breadcrumb_item" data-level="${index}">
                 <span>${icon} ${label}</span>
             </button>
         `);
@@ -176,70 +191,84 @@ class DrillDowner {
         </div>
     ` : '';
 
-        this.$controls.html(`
+        // Remove existing event listeners before changing innerHTML
+        this.controls = this._removeAllEventListeners(this.controls);
+
+        this.controls.innerHTML = `
         <div class="drillDowner_controls_container">
             <div class="drillDowner_breadcrumb_nav">
                 ${breadcrumbHTML}
             </div>
             ${groupingControlsHTML}
         </div>
-    `);
-        this.$controls.off();
-        this.$controls.on('click.' + idPrefix, '.drillDowner_breadcrumb_item', (e) => {
-            this.collapseToLevel(parseInt($(e.currentTarget).data('level')));
+    `;
+
+        // Add event listeners for breadcrumb items
+        const breadcrumbItems = this.controls.querySelectorAll('.drillDowner_breadcrumb_item');
+        breadcrumbItems.forEach(item => {
+            item.addEventListener('click', (e) => {
+                this.collapseToLevel(parseInt(e.currentTarget.dataset.level));
+            });
         });
 
-        this.$controls.on('click.' + idPrefix, '.drillDowner_breadcrumb_arrow', (e) => {
-            const arrowLevel = parseInt($(e.currentTarget).data('arrow-level'));
-            const targetLevel = arrowLevel + 1;
-            const $arrow = $(e.currentTarget);
-            const isCurrentlyExpanded = $arrow.hasClass('drillDowner_expanded');
+        // Add event listeners for breadcrumb arrows
+        const breadcrumbArrows = this.controls.querySelectorAll('.drillDowner_breadcrumb_arrow');
+        breadcrumbArrows.forEach(arrow => {
+            arrow.addEventListener('click', (e) => {
+                const arrowLevel = parseInt(e.currentTarget.dataset.arrowLevel);
+                const targetLevel = arrowLevel + 1;
+                const isCurrentlyExpanded = e.currentTarget.classList.contains('drillDowner_expanded');
 
-            if (isCurrentlyExpanded) {
-                this.collapseToLevel(arrowLevel);
-            } else {
-                this.collapseToLevel(targetLevel);
-            }
-        });
-
-        if(showGroupingControls) {
-            this.$controls.on('change.' + idPrefix, '#' + idPrefix + 'grouporder', e => {
-                if (this.options.groupOrderCombinations) {
-                    const selectedIndex = parseInt($(e.target).val());
-                    if (selectedIndex >= 0 && selectedIndex < this.options.groupOrderCombinations.length) {
-                        const newOrder = this.options.groupOrderCombinations[selectedIndex];
-                        this.changeGroupOrder(newOrder);
-                    }
+                if (isCurrentlyExpanded) {
+                    this.collapseToLevel(arrowLevel);
                 } else {
-                    const indices = $(e.target).val().split(',').map(i => parseInt(i));
-                    const newOrder = indices.map(i => this.options.groupOrder[i]);
-                    this.changeGroupOrder(newOrder);
+                    this.collapseToLevel(targetLevel);
                 }
             });
+        });
+
+        // Add event listener for group order select
+        if(showGroupingControls) {
+            const groupOrderSelect = this.controls.querySelector('#' + idPrefix + 'grouporder');
+            if (groupOrderSelect) {
+                groupOrderSelect.addEventListener('change', (e) => {
+                    if (this.options.groupOrderCombinations) {
+                        const selectedIndex = parseInt(e.target.value);
+                        if (selectedIndex >= 0 && selectedIndex < this.options.groupOrderCombinations.length) {
+                            const newOrder = this.options.groupOrderCombinations[selectedIndex];
+                            this.changeGroupOrder(newOrder);
+                        }
+                    } else {
+                        const indices = e.target.value.split(',').map(i => parseInt(i));
+                        const newOrder = indices.map(i => this.options.groupOrder[i]);
+                        this.changeGroupOrder(newOrder);
+                    }
+                });
+            }
         }
+
         this._updateBreadcrumbArrows(0);
     }
 
     _updateBreadcrumbArrows(level = 0) {
-        if(!this.$controls) return;
+        if(!this.controls) return;
 
-        const $arrows = this.$controls.find('.drillDowner_breadcrumb_arrow');
+        const arrows = this.controls.querySelectorAll('.drillDowner_breadcrumb_arrow');
 
-        $arrows.each((index, arrow) => {
-            const $arrow = $(arrow);
+        arrows.forEach((arrow, index) => {
             const targetLevel = index + 1;
 
             if(targetLevel < this.options.groupOrder.length) {
                 const nextLabel = this._getColLabel(this.options.groupOrder[targetLevel]);
 
-                $arrow.removeClass('drillDowner_expanded drillDowner_collapsed');
+                arrow.classList.remove('drillDowner_expanded', 'drillDowner_collapsed');
 
                 if(level >= targetLevel) {
-                    $arrow.addClass('drillDowner_expanded');
-                    $arrow.attr('title', `Collapsa a ${nextLabel} level`);
+                    arrow.classList.add('drillDowner_expanded');
+                    arrow.setAttribute('title', `Collapsa a ${nextLabel} level`);
                 } else {
-                    $arrow.addClass('drillDowner_collapsed');
-                    $arrow.attr('title', `Expande a ${nextLabel} level`);
+                    arrow.classList.add('drillDowner_collapsed');
+                    arrow.setAttribute('title', `Expande a ${nextLabel} level`);
                 }
             }
         });
@@ -269,7 +298,7 @@ class DrillDowner {
     }
 
     _renderAZBar() {
-        if(!this.$azBar) return;
+        if(!this.azBar) return;
         const groupCol = this._getGroupCol(0);
         const presentLetters = new Set(this.dataArr.map(x => (x[groupCol]||"")[0]?.toUpperCase()));
         let html = '';
@@ -281,17 +310,25 @@ class DrillDowner {
                 html += `<div class="drillDowner_az_dimmed">${ch}</div>`;
             }
         }
-        this.$azBar.html(html);
-        this.$azBar.off('click.' + this.options.idPrefix, this._onAZClick);
-        this.$azBar.on('click.' + this.options.idPrefix, '.' + this.options.idPrefix + 'az_link', this._onAZClick);
+
+        // Remove existing event listeners before changing innerHTML
+        this.azBar = this._removeAllEventListeners(this.azBar);
+
+        this.azBar.innerHTML = html;
+
+        // Add event listeners for AZ links
+        const azLinks = this.azBar.querySelectorAll('.' + this.options.idPrefix + 'az_link');
+        azLinks.forEach(link => {
+            link.addEventListener('click', this._onAZClick);
+        });
     }
 
     _renderTable() {
-        this.$container.empty();
+        this.container.innerHTML = '';
         const groupCols = ["Item"];
 
         // Build total headers using colProperties
-        const totalHeaders = this.totals.map(totalCol => {
+        const totalHeaders = this.options.totals.map(totalCol => {
             const subTotalBy = this._getColProperty(totalCol, 'subTotalBy');
             if(subTotalBy) {
                 const mainLabel = this._getColLabel(totalCol);
@@ -303,13 +340,13 @@ class DrillDowner {
         });
 
         // Build column headers using colProperties
-        const columnHeaders = this.columns.map(col => this._getColLabel(col));
+        const columnHeaders = this.options.columns.map(col => this._getColLabel(col));
 
         const allHeaders = [...groupCols, ...totalHeaders, ...columnHeaders];
 
         // ---- Build Header Row ----
-        const $thead = $('<thead></thead>');
-        const $headerRow = $('<tr></tr>');
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
 
         allHeaders.forEach((headerLabel, index) => {
             let headerClass = '';
@@ -317,9 +354,9 @@ class DrillDowner {
 
             if(index === 0) {
                 // "Item" column - no special class, no grand total
-            } else if(index <= this.totals.length) {
+            } else if(index <= this.options.totals.length) {
                 // Total columns - add grand total in header if enabled
-                const totalCol = this.totals[index - 1];
+                const totalCol = this.options.totals[index - 1];
                 headerClass = this._getColLabelClass(totalCol);
 
                 if(this.options.showGrandTotals) {
@@ -329,27 +366,30 @@ class DrillDowner {
                 }
             } else {
                 // Data columns
-                const col = this.columns[index - this.totals.length - 1];
+                const col = this.options.columns[index - this.options.totals.length - 1];
                 headerClass = this._getColLabelClass(col);
             }
 
-            const $th = $(`<th class="${headerClass}">${headerContent}</th>`);
-            $headerRow.append($th);
+            const th = document.createElement('th');
+            th.className = headerClass;
+            th.innerHTML = headerContent;
+            headerRow.appendChild(th);
         });
 
-        $thead.append($headerRow);
+        thead.appendChild(headerRow);
 
         // ---- Build Table Body ----
         const rows = [];
         this._sortAsc(this.dataArr, this.options.groupOrder);
         this._buildFlatRows(this.dataArr, this.options.groupOrder, 0, {}, rows);
-        const $tbody = $('<tbody></tbody>');
-        rows.forEach(row => $tbody.append(row));
+        const tbody = document.createElement('tbody');
+        rows.forEach(row => tbody.appendChild(row));
 
         // ---- Build Footer Row (identical to header) ----
-        const $tfoot = $('<tfoot></tfoot>');
+        let tfoot = null;
         if(this.options.showGrandTotals) {
-            const $footerRow = $('<tr></tr>');
+            tfoot = document.createElement('tfoot');
+            const footerRow = document.createElement('tr');
 
             allHeaders.forEach((headerLabel, index) => {
                 let footerClass = '';
@@ -359,37 +399,46 @@ class DrillDowner {
                     // "Item" column
                     footerContent = '<b>Total</b>';
                     footerClass += " drillDowner_right";
-                } else if(index <= this.totals.length) {
+                } else if(index <= this.options.totals.length) {
                     // Total columns - show grand total
-                    const totalCol = this.totals[index - 1];
+                    const totalCol = this.options.totals[index - 1];
                     footerClass = this._getColLabelClass(totalCol) + ' drillDowner_num drillDownerTfootTotal';
                     footerContent = `${this._formatGrandTotal(totalCol)}`;
                 } else {
                     // Data columns - empty
-                    const col = this.columns[index - this.totals.length - 1];
+                    const col = this.options.columns[index - this.options.totals.length - 1];
                     footerClass = this._getColLabelClass(col);
                     footerContent = '';
                 }
 
-                const $tf = $(`<td class="${footerClass}">${footerContent}</td>`);
-                $footerRow.append($tf);
+                const td = document.createElement('td');
+                td.className = footerClass;
+                td.innerHTML = footerContent;
+                footerRow.appendChild(td);
             });
 
-            $tfoot.append($footerRow);
+            tfoot.appendChild(footerRow);
         }
 
         // ---- Assemble Table ----
-        const $table = $('<table class="drillDowner_table"></table>');
-        $table.append($thead).append($tbody);
+        const table = document.createElement('table');
+        table.className = 'drillDowner_table';
+        table.appendChild(thead);
+        table.appendChild(tbody);
 
-        if(this.options.showGrandTotals) {
-            $table.append($tfoot);
+        if(this.options.showGrandTotals && tfoot) {
+            table.appendChild(tfoot);
         }
 
-        this.$container.append($table);
-        $table.off('click.' + this.options.idPrefix, '.' + this.options.idPrefix + 'drill_icon', this._onDrillClick);
-        $table.on('click.' + this.options.idPrefix, '.' + this.options.idPrefix + 'drill_icon', this._onDrillClick);
-        this.$table = $table;
+        this.container.appendChild(table);
+
+        // Add event listeners for drill icons
+        const drillIcons = table.querySelectorAll('.' + this.options.idPrefix + 'drill_icon');
+        drillIcons.forEach(icon => {
+            icon.addEventListener('click', this._onDrillClick);
+        });
+
+        this.table = table;
     }
 
     _buildFlatRows(dataArr, groupOrder, level, parentKeys, rows) {
@@ -415,18 +464,18 @@ class DrillDowner {
                 return parentKeys[col];
             }).join("_").replace(/\s/g, "_");
 
-            const $tr = $('<tr></tr>')
-                .attr("id", rowId)
-                .attr("data-level", level)
-                .attr("data-parent", parentId)
-                .addClass("drillDowner_row_" + groupKey);
+            const tr = document.createElement('tr');
+            tr.id = rowId;
+            tr.setAttribute("data-level", level);
+            tr.setAttribute("data-parent", parentId);
+            tr.classList.add("drillDowner_row_" + groupKey);
 
-            if(i % 2 === 1) $tr.addClass('drillDowner_even');
-            if(i === 0) $tr.addClass('drillDowner_first_group');
+            if(i % 2 === 1) tr.classList.add('drillDowner_even');
+            if(i === 0) tr.classList.add('drillDowner_first_group');
 
             if(level === 0 && key.length > 0) {
                 const firstLetter = key.charAt(0).toUpperCase();
-                $tr.attr("id", this.options.idPrefix + "az" + firstLetter);
+                tr.id = this.options.idPrefix + "az" + firstLetter;
             }
 
             let icon = '';
@@ -436,16 +485,22 @@ class DrillDowner {
             let label;
             if(level === 0) label = `<span class="drillDowner_indent_${level}">${icon}<b>${key}</b></span>`;
             else label = `<span class="drillDowner_indent_${level}">${icon}${key}</span>`;
-            $tr.append(`<td>${label}</td>`);
+
+            const firstCell = document.createElement('td');
+            firstCell.innerHTML = label;
+            tr.appendChild(firstCell);
 
             // ---- Totals columns using colProperties ----
-            this.totals.forEach(totalCol => {
+            this.options.totals.forEach(totalCol => {
                 const decimals = this._getColDecimals(totalCol);
                 const subTotalBy = this._getColProperty(totalCol, 'subTotalBy');
 
+                const td = document.createElement('td');
+                td.className = 'drillDowner_num';
+
                 if(!subTotalBy) {
                     const sum = groupData.reduce((a, b) => a + (b[totalCol] || 0), 0);
-                    $tr.append(`<td class="drillDowner_num">${DrillDowner.formatNumber(sum, decimals)}</td>`);
+                    td.innerHTML = DrillDowner.formatNumber(sum, decimals);
                 } else {
                     const subtotals = {};
                     groupData.forEach(row => {
@@ -457,15 +512,20 @@ class DrillDowner {
                     const str = Object.entries(subtotals)
                         .map(([sub, val]) => DrillDowner.formatNumber(val, decimals) + " " + sub)
                         .join(', ') || '-';
-                    $tr.append(`<td class="drillDowner_num">${str}</td>`);
+                    td.innerHTML = str;
                 }
+
+                tr.appendChild(td);
             });
 
             // ---- Display columns using colProperties ----
-            this.columns.forEach(col => {
+            this.options.columns.forEach(col => {
                 const togglesUp = this._getColTogglesUp(col);
                 const cellClass = this._getColClass(col);
                 const formatter = this._getColFormatter(col);
+
+                const td = document.createElement('td');
+                td.className = cellClass;
 
                 if(togglesUp) {
                     const uniqueValues = new Set();
@@ -479,7 +539,7 @@ class DrillDowner {
                         }
                     }
                     const displayValue = Array.from(uniqueValues).join(', ');
-                    $tr.append(`<td class="${cellClass}">${displayValue}</td>`);
+                    td.innerHTML = displayValue;
                 } else {
                     if(level === groupOrder.length - 1 && groupData.length === 1) {
                         const item = groupData[0];
@@ -487,14 +547,16 @@ class DrillDowner {
                         if(formatter && typeof formatter === 'function') {
                             val = formatter(val, item);
                         }
-                        $tr.append(`<td class="${cellClass}">${val}</td>`);
+                        td.innerHTML = val;
                     } else {
-                        $tr.append(`<td class="${cellClass}"></td>`);
+                        td.innerHTML = '';
                     }
                 }
+
+                tr.appendChild(td);
             });
 
-            rows.push($tr);
+            rows.push(tr);
 
             if(level < groupOrder.length - 1) {
                 this._buildFlatRows(groupData, groupOrder, level + 1, {...parentKeys, [groupCol]: key}, rows);
@@ -503,32 +565,36 @@ class DrillDowner {
     }
 
     _onDrillClick(e) {
-        const $icon = $(e.target);
-        const thisRowId = $icon.data('rowid');
-        const thisLevel = +$icon.data('level');
-        const $table = $icon.closest('table');
-        const $allRows = $table.find('tbody tr');
-        if($icon.hasClass('drillDowner_drill_collapsed')) {
-            $icon.removeClass('drillDowner_drill_collapsed').addClass('drillDowner_drill_expanded');
-            this._setChildrenVisible(thisRowId, thisLevel, true, $allRows);
+        const icon = e.target;
+        const thisRowId = icon.dataset.rowid;
+        const thisLevel = +icon.dataset.level;
+        const table = icon.closest('table');
+        const allRows = table.querySelectorAll('tbody tr');
+
+        if(icon.classList.contains('drillDowner_drill_collapsed')) {
+            icon.classList.remove('drillDowner_drill_collapsed');
+            icon.classList.add('drillDowner_drill_expanded');
+            this._setChildrenVisible(thisRowId, thisLevel, true, allRows);
         } else {
-            $icon.removeClass('drillDowner_drill_expanded').addClass('drillDowner_drill_collapsed');
-            this._setChildrenVisible(thisRowId, thisLevel, false, $allRows);
+            icon.classList.remove('drillDowner_drill_expanded');
+            icon.classList.add('drillDowner_drill_collapsed');
+            this._setChildrenVisible(thisRowId, thisLevel, false, allRows);
         }
     }
 
-    _setChildrenVisible(parentId, parentLevel, visible, $allRows) {
-        $allRows.each((_, tr) => {
-            const $row = $(tr);
-            if($row.attr('data-parent') === parentId) {
+    _setChildrenVisible(parentId, parentLevel, visible, allRows) {
+        allRows.forEach(row => {
+            if(row.getAttribute('data-parent') === parentId) {
                 if(visible) {
-                    $row.show();
+                    row.style.display = '';
                 } else {
-                    $row.hide();
-                    $row.find('.drillDowner_drill_icon')
-                        .removeClass('drillDowner_drill_expanded')
-                        .addClass('drillDowner_drill_collapsed');
-                    this._setChildrenVisible($row.attr('id'), +$row.attr('data-level'), false, $allRows);
+                    row.style.display = 'none';
+                    const drillIcons = row.querySelectorAll('.drillDowner_drill_icon');
+                    drillIcons.forEach(icon => {
+                        icon.classList.remove('drillDowner_drill_expanded');
+                        icon.classList.add('drillDowner_drill_collapsed');
+                    });
+                    this._setChildrenVisible(row.id, +row.getAttribute('data-level'), false, allRows);
                 }
             }
         });
@@ -536,7 +602,7 @@ class DrillDowner {
 
     _onAZClick(e) {
         setTimeout(function(){
-            // window.scrollBy(0, -30);
+            window.scrollBy(0, -30);
         }, 1);
     }
 
@@ -572,7 +638,7 @@ class DrillDowner {
     _calculateGrandTotals() {
         const grandTotals = {};
 
-        this.totals.forEach(totalCol => {
+        this.options.totals.forEach(totalCol => {
             const subTotalBy = this._getColProperty(totalCol, 'subTotalBy');
 
             if (!subTotalBy) {
@@ -612,8 +678,8 @@ class DrillDowner {
 
     // Helper methods to get properties from this.options.colProperties
     _getColProperty(col, property, fallback = null) {
-        if(this.colProperties[col] && this.colProperties[col][property] !== undefined) {
-            return this.colProperties[col][property];
+        if(this.options.colProperties[col] && this.options.colProperties[col][property] !== undefined) {
+            return this.options.colProperties[col][property];
         }
         return fallback;
     }
@@ -631,4 +697,19 @@ class DrillDowner {
     _getGroupLabel(level) {return this._getColLabel(this._getGroupCol(level));}
     _getGroupKey(level) {return this._getColKey(this._getGroupCol(level));}
 
+    // Helper method to remove all event listeners from an element
+    _removeAllEventListeners(element) {
+        if (!element) return;
+
+        // Create a clone of the element without event listeners
+        const clone = element.cloneNode(true);
+
+        // Replace the original element with the clone
+        if (element.parentNode) {
+            element.parentNode.replaceChild(clone, element);
+            return clone;
+        }
+
+        return element;
+    }
 }

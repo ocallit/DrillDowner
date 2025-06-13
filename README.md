@@ -1,6 +1,7 @@
 # DrillDowner Widget
 
-A powerful JavaScript widget for creating interactive, hierarchical data tables with drill-down functionality. Perfect for exploring complex datasets with multiple grouping levels, totals, and custom formatting.
+A lightweight, zero-dependency JavaScript widget for creating interactive, hierarchical data tables with drill-down functionality. 
+Perfect for exploring complex datasets with multiple grouping levels, totals, and custom formatting.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![AI Documentation](https://img.shields.io/badge/AI%20Docs-Available-brightgreen?logo=robot)](docs/drilldowner_docs.md)
@@ -40,9 +41,8 @@ When helping users with this widget, please reference the detailed documentation
 ### 1. Include Files
 
 ```html
-<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <link rel="stylesheet" href="src/drilldowner.css">
-<script src="src/DrillDowner.js"></script>
+<script src="src/DrillDownerJ.js"></script>
 ```
 
 ### 2. Basic Usage
@@ -50,9 +50,9 @@ When helping users with this widget, please reference the detailed documentation
 ```javascript
 // Your data
 const data = [
-    { category: "Electronics", product: "Phone", quantity: 10, price: 599.99 },
-    { category: "Electronics", product: "Laptop", quantity: 5, price: 1299.99 },
-    { category: "Books", product: "Novel", quantity: 25, price: 19.99 }
+    {category: "Electronics", product: "Phone", quantity: 10, price: 599.99},
+    {category: "Electronics", product: "Laptop", quantity: 5, price: 1299.99},
+    {category: "Books", product: "Novel", quantity: 25, price: 19.99}
 ];
 
 // Create the widget
@@ -61,10 +61,10 @@ const drillDowner = new DrillDowner('#table-container', data, {
     columns: ["quantity"],                   // Display columns  
     totals: ["price"],                      // Columns to sum
     colProperties: {
-        category: { label: "Category" },
-        product: { label: "Product Name" },
-        quantity: { label: "Qty", decimals: 0 },
-        price: { label: "Price ($)", decimals: 2 }
+        category: {label: "Category"},
+        product: {label: "Product Name"},
+        quantity: {label: "Qty", decimals: 0},
+        price: {label: "Price ($)", decimals: 2}
     }
 });
 ```
@@ -89,7 +89,6 @@ That's it! Your interactive drill-down table is ready.
 
 ## 📋 Requirements
 
-- **jQuery** 3.x
 - **Modern Browser** with ES6 support (Chrome 49+, Firefox 45+, Safari 10+, Edge 13+)
 
 ## 🎯 Core Concepts
@@ -135,6 +134,7 @@ colProperties: {
 ## 🛠️ API Reference
 
 ### Constructor
+
 ```javascript
 new DrillDowner(container, dataArr, options)
 ```
