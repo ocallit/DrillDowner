@@ -304,8 +304,9 @@ class DrillDowner {
         let html = '';
         for (let i = 65; i <= 90; i++) {
             const ch = String.fromCharCode(i);
+            const anchorId = `${this.options.idPrefix}az${ch}`;
             if(presentLetters.has(ch)) {
-                html += `<div><a href="#${this.options.idPrefix}az${ch}" class="drillDowner_az_link ${this.options.idPrefix}az_link">${ch}</a></div>`;
+                html += `<div><a href="#${anchorId}" class="drillDowner_az_link ${this.options.idPrefix}az_link">${ch}</a></div>`;
             } else {
                 html += `<div class="drillDowner_az_dimmed">${ch}</div>`;
             }
@@ -380,6 +381,7 @@ class DrillDowner {
 
         // ---- Build Table Body ----
         const rows = [];
+        this.azAnchoredLetters = new Set();
         this._sortAsc(this.dataArr, this.options.groupOrder);
         this._buildFlatRows(this.dataArr, this.options.groupOrder, 0, {}, rows);
         const tbody = document.createElement('tbody');
@@ -473,9 +475,14 @@ class DrillDowner {
             if(i % 2 === 1) tr.classList.add('drillDowner_even');
             if(i === 0) tr.classList.add('drillDowner_first_group');
 
+            let anchorHtml = '';
             if(level === 0 && key.length > 0) {
                 const firstLetter = key.charAt(0).toUpperCase();
-                tr.id = this.options.idPrefix + "az" + firstLetter;
+                if(!this.azAnchoredLetters.has(firstLetter)) {
+                    const anchorId = this.options.idPrefix + "az" + firstLetter;
+                    anchorHtml = `<span id="${anchorId}" class="drillDowner_az_anchor"></span>`;
+                    this.azAnchoredLetters.add(firstLetter);
+                }
             }
 
             let icon = '';
@@ -487,7 +494,7 @@ class DrillDowner {
             else label = `<span class="drillDowner_indent_${level}">${icon}${key}</span>`;
 
             const firstCell = document.createElement('td');
-            firstCell.innerHTML = label;
+            firstCell.innerHTML = anchorHtml + label;
             tr.appendChild(firstCell);
 
             // ---- Totals columns using colProperties ----
