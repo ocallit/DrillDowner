@@ -605,7 +605,8 @@ class DrillDowner {
     }
 
     static formatNumber(n, decimals) {
-        if(isNaN(n)) return n;
+        if (n === '' || n === null) return '';
+        if (isNaN(n)) return n;
         return Number(n).toLocaleString('en-US', {
             minimumFractionDigits: decimals,
             maximumFractionDigits: decimals
