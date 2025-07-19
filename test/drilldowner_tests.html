@@ -6,11 +6,10 @@
     <title>DrillDowner QUnit Test Suite</title>
 
     <!-- QUnit CSS and JS -->
-    <link rel="stylesheet" href="https://code.jquery.com/qunit/qunit-2.19.4.css">
-    <script src="https://code.jquery.com/qunit/qunit-2.19.4.js"></script>
-
+    <link rel="stylesheet" href="../tools/qunit-2.24.1.css">
+    <script src="../tools/qunit-2.24.1.js"></script>
     <!-- jQuery (only for QUnit test helpers, not for DrillDowner) -->
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="../tools/jquery-3.7.1.min.js"></script>
 
 
     <!-- DrillDowner files - these would need to be included in your test environment -->
@@ -442,6 +441,103 @@
             drillDowner.destroy();
         });
     });
+
+    QUnit.test('groupOrderCombinations populates selector', function(assert) {
+        const container = '#test-container';
+        const controls = '#test-controls';
+        document.querySelector(container).innerHTML = '';
+        document.querySelector(controls).innerHTML = '';
+
+        // Default selector shows all permutations
+        const ddDefault = new DrillDowner(container, testData, {
+            groupOrder: ['p', 'c', 'w'],
+            columns: ['status'],
+            totals: ['rolls'],
+            colProperties: testColProperties,
+            controlsSelector: controls
+        });
+        const defaultSelect = document.querySelector(controls + ' select');
+        const defaultCount = defaultSelect ? defaultSelect.options.length : 0;
+        ddDefault.destroy();
+
+        document.querySelector(container).innerHTML = '';
+        document.querySelector(controls).innerHTML = '';
+
+        const combinations = [
+
+            ['c', 'p',],
+            ['w', 'p', 'c'],
+            ['w', 'p', 'c'],
+            ['p', 'w', 'c']
+        ];
+
+        const drillDowner = new DrillDowner(container, testData, {
+            groupOrder: combinations[0],
+            groupOrderCombinations: combinations,
+            columns: ['status'],
+            totals: ['rolls'],
+            colProperties: testColProperties,
+            controlsSelector: controls
+        });
+
+        const select = document.querySelector(controls + ' select');
+        assert.ok(select, 'Select element exists');
+        assert.equal(select.options.length, combinations.length, 'Correct number of options');
+        assert.equal(defaultCount, 6, 'Default generated six permutations');
+        assert.equal(select.options.length, combinations.length, 'Custom list has expected number of options');
+
+        const optionTexts = Array.from(select.options).map(o => o.textContent.trim());
+        assert.ok(optionTexts[0].includes('Producto'), 'Options use column labels');
+        const expectedTexts = combinations.map(combo =>
+            combo.map(col => testColProperties[col].label).join(' → ')
+        );
+        const actualTexts = Array.from(select.options).map(o => o.textContent.trim());
+        assert.deepEqual(actualTexts, expectedTexts, 'Options match provided combinations in order');
+
+        drillDowner.destroy();
+    });
+
+    QUnit.test('groupOrderCombinations selection updates order', function(assert) {
+        const container = '#test-container';
+        const controls = '#test-controls';
+        document.querySelector(container).innerHTML = '';
+        document.querySelector(controls).innerHTML = '';
+
+        const combinations = [
+            ['p', 'c'],
+            ['c', 'p']
+                ['c', 'p', 'w'],
+            ['w', 'p', 'c'],
+            ['p', 'w', 'c']
+        ];
+
+        const drillDowner = new DrillDowner(container, testData, {
+            groupOrder: combinations[0],
+            groupOrderCombinations: combinations,
+            columns: ['status'],
+            totals: ['rolls'],
+            colProperties: testColProperties,
+            controlsSelector: controls
+        });
+
+        // verify initial grouping by color
+        const firstLevelLabels = Array.from(document.querySelectorAll(container + ' tbody tr[data-level="0"] td:first-child')).map(td => td.textContent);
+        const colorNames = ['Rojo', 'Azul', 'Verde', 'Amarillo', 'Naranja', 'Naranja2'];
+        assert.ok(firstLevelLabels.some(l => colorNames.some(c => l.includes(c))), 'Initial grouping by color');
+
+        const select = document.querySelector(controls + ' select');
+        select.value = '1';
+        select.dispatchEvent(new Event('change'));
+
+        assert.deepEqual(drillDowner.options.groupOrder, combinations[1], 'Group order changed via combinations');
+
+        const firstLevelAfter = Array.from(document.querySelectorAll(container + ' tbody tr[data-level="0"] td:first-child')).map(td => td.textContent);
+        const warehouseNames = ['W1', 'W2', 'W3'];
+        assert.ok(firstLevelAfter.some(l => warehouseNames.some(w => l.includes(w))), 'Rows regrouped by warehouse');
+
+        drillDowner.destroy();
+    });
+
 
     QUnit.module('DrillDowner AZ Bar', function() {
         QUnit.test('AZ bar renders correctly', function(assert) {

@@ -54,70 +54,21 @@
     </style>
 </head>
 <body>
-    <h1>DrillDowner Example</h1>
-    
-    <div class="note">
-        <strong>Note:</strong> This is the vanilla JavaScript version of DrillDowner that doesn't require jQuery.
-    </div>
+    <h1>DrillDowner - Example</h1>
 
-    <h2>Live Demo</h2>
-    
     <div class="controls" id="table-controls"></div>
-    
     <div class="container">
         <div class="sidebar" id="az-bar"></div>
         <div class="main-content" id="table-container"></div>
     </div>
-    
-    <h2>Usage Example</h2>
-    
-    <pre><code>// Sample data
-const data = [
-    { category: "Electronics", product: "Phone", quantity: 10, price: 599.99 },
-    { category: "Electronics", product: "Laptop", quantity: 5, price: 1299.99 },
-    { category: "Books", product: "Novel", quantity: 25, price: 19.99 }
-];
-
-// Initialize DrillDowner
-const drillDowner = new DrillDowner('#table-container', data, {
-    groupOrder: ["category", "product"],
-    columns: ["quantity"],
-    totals: ["price"],
-    colProperties: {
-        category: { label: "Category" },
-        product: { label: "Product Name" },
-        quantity: { label: "Qty", decimals: 0 },
-        price: { label: "Price ($)", decimals: 2 }
-    },
-    controlsSelector: '#table-controls',
-    azBarSelector: '#az-bar'
-});</code></pre>
-
-    <h2>Migration from jQuery Version</h2>
-    
-    <p>When migrating from the jQuery version to this vanilla JavaScript version, you only need to change:</p>
-    
-    <ol>
-        <li><strong>Constructor parameter:</strong> The container parameter can be either a DOM element or a selector string</li>
-        <li><strong>getTable() method:</strong> Returns a DOM element instead of a jQuery object</li>
-    </ol>
-    
-    <pre><code>// jQuery version
-const $table = drillDowner.getTable(); // Returns jQuery object
-$table.addClass('my-class');
-
-// Vanilla JS version
-const table = drillDowner.getTable(); // Returns DOM element
-table.classList.add('my-class');</code></pre>
 
     <script>
-        // Sample data for the demo
         const sampleData = [
-            { category: "Electronics", product: "Smartphone", brand: "Apple", quantity: 15, price: 999.99 },
-            { category: "Electronics", product: "Smartphone", brand: "Samsung", quantity: 20, price: 899.99 },
-            { category: "Electronics", product: "Laptop", brand: "Dell", quantity: 8, price: 1299.99 },
-            { category: "Electronics", product: "Laptop", brand: "HP", quantity: 12, price: 1199.99 },
-            { category: "Electronics", product: "Tablet", brand: "Apple", quantity: 10, price: 599.99 },
+            { category: "Electronics", product: "Smartphone", brand: "Apple", quantity: 15, price: 999.99, info:"info esa" },
+            { category: "Electronics", product: "Smartphone", brand: "Samsung", quantity: 20, price: 899.99, info:"info ess" },
+            { category: "Electronics", product: "Laptop", brand: "Dell", quantity: 8, price: 1299.99, info:"info eld" },
+            { category: "Electronics", product: "Laptop", brand: "HP", quantity: 12, price: 1199.99, info:"info eshp" },
+            { category: "Electronics", product: "Tablet", brand: "Apple", quantity: 10, price: 599.99, info:"info ETA" },
             { category: "Electronics", product: "Tablet", brand: "Samsung", quantity: 15, price: 499.99 },
             { category: "Books", product: "Fiction", brand: "Penguin", quantity: 30, price: 15.99 },
             { category: "Books", product: "Fiction", brand: "HarperCollins", quantity: 25, price: 14.99 },
@@ -143,6 +94,10 @@ table.classList.add('my-class');</code></pre>
                 label: "Brand",
                 icon: "🏷️"
             },
+            info: {
+                label: "Info",
+                icon: "?"
+            },
             quantity: { 
                 label: "Quantity",
                 decimals: 0,
@@ -151,7 +106,7 @@ table.classList.add('my-class');</code></pre>
             price: { 
                 label: "Price ($)",
                 decimals: 2,
-                subTotalBy: "brand",
+
                 class: "text-right",
                 formatter: function(value) {
                     return "$" + value;
@@ -162,10 +117,11 @@ table.classList.add('my-class');</code></pre>
         // Initialize DrillDowner
         document.addEventListener('DOMContentLoaded', function() {
             const drillDowner = new DrillDowner('#table-container', sampleData, {
-                groupOrder: ["category", "product", "brand"],
-                columns: ["quantity"],
-                totals: ["price"],
+                groupOrder: ["category", "brand","product"],
+                columns: ["info"],
+                totals: ["price","quantity"],
                 colProperties: colProperties,
+             //   groupOrderCombinations:[["brand","product"],["category","product"],["category","brand","product"]],
                 controlsSelector: '#table-controls',
                 azBarSelector: '#az-bar'
             });
