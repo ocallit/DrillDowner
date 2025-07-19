@@ -5,6 +5,16 @@
     border: 1px solid #aaa; padding: 4px 8px; background: #fff; vertical-align: top;
 }
 
+/* Alternating row color for easier readability */
+.drillDowner_even td {
+    background-color: #f9f9f9;
+}
+
+/* Marks the first row in a group with a top border */
+.drillDowner_first_group td {
+    border-top: 2px solid #ccc;
+}
+
 .drillDowner_table th {
     position: sticky;
     top: 0;
