@@ -476,12 +476,15 @@ class DrillDowner {
             if(i === 0) tr.classList.add('drillDowner_first_group');
 
             let anchorHtml = '';
-            if(level === 0 && key.length > 0) {
-                const firstLetter = key.charAt(0).toUpperCase();
-                if(!this.azAnchoredLetters.has(firstLetter)) {
-                    const anchorId = this.options.idPrefix + "az" + firstLetter;
-                    anchorHtml = `<span id="${anchorId}" class="drillDowner_az_anchor"></span>`;
-                    this.azAnchoredLetters.add(firstLetter);
+            if(level === 0) {
+                const keyString = key == null ? '' : String(key);
+                if(keyString.length > 0) {
+                    const firstLetter = keyString.charAt(0).toUpperCase();
+                    if(!this.azAnchoredLetters.has(firstLetter)) {
+                        const anchorId = this.options.idPrefix + "az" + firstLetter;
+                        anchorHtml = `<span id="${anchorId}" class="drillDowner_az_anchor"></span>`;
+                        this.azAnchoredLetters.add(firstLetter);
+                    }
                 }
             }
 
@@ -512,7 +515,8 @@ class DrillDowner {
                     const subtotals = {};
                     groupData.forEach(row => {
                         const k = row[subTotalBy];
-                        if(row[totalCol] != null && k) {
+                        const hasKey = k === null ? false : true;
+                        if(row[totalCol] != null && hasKey) {
                             subtotals[k] = (subtotals[k] || 0) + row[totalCol];
                         }
                     });
@@ -655,7 +659,8 @@ class DrillDowner {
                 const subtotals = {};
                 this.dataArr.forEach(row => {
                     const key = row[subTotalBy];
-                    if (row[totalCol] != null && key) {
+                    const hasKey = key === null ? false : true;
+                    if (row[totalCol] != null && hasKey) {
                         subtotals[key] = (subtotals[key] || 0) + row[totalCol];
                     }
                 });
