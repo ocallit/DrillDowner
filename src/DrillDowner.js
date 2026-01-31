@@ -9,6 +9,7 @@ class DrillDowner {
             colProperties: {},
             groupOrder: [],
             groupOrderCombinations: null,
+            ledger: null, // New Option: { label: "String", cols: [], sort: [] }
             idPrefix: 'drillDowner' + Math.random().toString(36).slice(2) + '_',
             azBarSelector: null,
             controlsSelector: null,
@@ -16,11 +17,15 @@ class DrillDowner {
         }, options);
         this.options.totals = this.options.totals || [];
         this.options.columns = this.options.columns || [];
+
+        // Save default columns to restore them when switching back from Ledger mode
+        this._defaultColumns = [...this.options.columns];
+
         this.options.colProperties = this.options.colProperties || {};
 
-        this.azBar = this.options.azBarSelector ? (typeof this.options.azBarSelector === 'string' ? 
+        this.azBar = this.options.azBarSelector ? (typeof this.options.azBarSelector === 'string' ?
             document.querySelector(this.options.azBarSelector) : this.options.azBarSelector) : null;
-        this.controls = this.options.controlsSelector ? (typeof this.options.controlsSelector === 'string' ? 
+        this.controls = this.options.controlsSelector ? (typeof this.options.controlsSelector === 'string' ?
             document.querySelector(this.options.controlsSelector) : this.options.controlsSelector) : null;
         this._natSort = new Intl.Collator('es-MX', {
             sensitivity: 'base',   // case & accent insensitive
@@ -36,12 +41,29 @@ class DrillDowner {
 
     // ---------- Public Methods ----------
     collapseToLevel(level = 0) {
-        if(isNaN(level) || level == null|| level < 0)
+        // Guard: missing container (selector not found) or destroyed state
+        if(!this.container) return this;
+
+        // Guard: no grouping configured (Ledger Mode) => nothing to collapse/expand
+        if(!this.options.groupOrder || this.options.groupOrder.length === 0) {
+            this._updateBreadcrumbArrows(0);
+            return this;
+        }
+
+        if(isNaN(level) || level == null || level < 0)
             level = 0;
-        if(level >= this.options.groupOrder.length)
-            level = this.options.groupOrder.length - 1;
+
+        // Clamp level to the last valid level
+        const maxLevel = this.options.groupOrder.length - 1;
+        if(level > maxLevel) level = maxLevel;
 
         const table = this.container.querySelector('table.drillDowner_table');
+        if(!table) {
+            // Called before render() or after destroy(): do not crash
+            this._updateBreadcrumbArrows(level);
+            return this;
+        }
+
         const rows = table.querySelectorAll('tbody tr');
         rows.forEach(row => {
             const lvl = +row.getAttribute('data-level');
@@ -54,9 +76,11 @@ class DrillDowner {
                 icon.classList.add('drillDowner_drill_collapsed');
             });
         });
+
         this._updateBreadcrumbArrows(level);
         return this;
     }
+
 
     collapseAll() { this.collapseToLevel(0); return this;}
 
@@ -85,6 +109,18 @@ class DrillDowner {
         // Recalculate grand totals when rendering (in case data changed)
         this.grandTotals = this._calculateGrandTotals();
 
+        // --- NEW LOGIC: Sync active columns based on mode ---
+        // This ensures columns are correct on initialization, manual change, or UI change.
+        if (this.options.groupOrder.length === 0 && this.options.ledger) {
+            // Ledger Mode: Use ledger columns
+            if (this.options.ledger.cols) {
+                this.options.columns = this.options.ledger.cols;
+            }
+        } else {
+            // Grouped Mode: Restore standard columns from backup
+            this.options.columns = [...this._defaultColumns];
+        }
+
         // Clean up existing elements and their event listeners before rendering
         if(this.controls) {
             this.controls = this._removeAllEventListeners(this.controls);
@@ -99,7 +135,11 @@ class DrillDowner {
         this._renderControls();
         this._renderAZBar();
         this._renderTable();
-        this.collapseToLevel(0);
+
+        // Only collapse if we have groups
+        if(this.options.groupOrder.length > 0) {
+            this.collapseToLevel(0);
+        }
     }
 
     getTable() { return this.container.querySelector('table.drillDowner_table'); }
@@ -111,27 +151,31 @@ class DrillDowner {
 
         const breadcrumbElements = [];
 
-        this.options.groupOrder.forEach((col, index) => {
-            const label = this._getColLabel(col);
-            const icon = this._getGroupIcon(col);
+        if (this.options.groupOrder.length > 0) {
+            this.options.groupOrder.forEach((col, index) => {
+                const label = this._getColLabel(col);
+                const icon = this._getGroupIcon(col);
 
-            breadcrumbElements.push(`
-            <button type="button" class="drillDowner_breadcrumb_item" data-level="${index}">
-                <span>${icon} ${label}</span>
-            </button>
-        `);
-
-            if(index < this.options.groupOrder.length - 1) {
-                const nextLabel = this._getColLabel(this.options.groupOrder[index + 1]);
                 breadcrumbElements.push(`
-                <button type="button" class="drillDowner_breadcrumb_arrow drillDowner_collapsed"
-                     data-arrow-level="${index}"
-                     title="Click to expand to ${nextLabel} level">
-                    <span class="drillDowner_arrow_icon">▶</span>
+                <button type="button" class="drillDowner_breadcrumb_item" data-level="${index}">
+                    <span>${icon} ${label}</span>
                 </button>
             `);
-            }
-        });
+
+                if(index < this.options.groupOrder.length - 1) {
+                    const nextLabel = this._getColLabel(this.options.groupOrder[index + 1]);
+                    breadcrumbElements.push(`
+                    <button type="button" class="drillDowner_breadcrumb_arrow drillDowner_collapsed"
+                         data-arrow-level="${index}"
+                         title="Click to expand to ${nextLabel} level">
+                        <span class="drillDowner_arrow_icon">▶</span>
+                    </button>
+                `);
+                }
+            });
+        } else if (this.options.ledger) {
+            breadcrumbElements.push(`<span class="drillDowner_breadcrumb_item" style="cursor:default"><b>${this.options.ledger.label}</b></span>`);
+        }
 
         const breadcrumbHTML = breadcrumbElements.join('');
 
@@ -146,38 +190,52 @@ class DrillDowner {
         } else {
             const groupCount = this.options.groupOrder.length;
 
-            if(groupCount === 0) {
+            if(groupCount === 0 && !this.options.ledger) {
+                // If pure flat mode without ledger config, hide controls or show empty
                 selectOptions = '<option value="">No grouping available</option>';
                 showGroupingControls = false;
-            } else if(groupCount === 1) {
-                showGroupingControls = false;
-            } else if(groupCount === 2) {
-                const labels = this.options.groupOrder.map(col => this._getColLabel(col));
-                selectOptions = `
-                <option value="0,1">${labels[0]} → ${labels[1]}</option>
-                <option value="1,0">${labels[1]} → ${labels[0]}</option>
-            `;
-            } else if(groupCount === 3) {
-                const labels = this.options.groupOrder.map(col => this._getColLabel(col));
-                selectOptions = `
-                <option value="0,1,2">${labels[0]} → ${labels[1]} → ${labels[2]}</option>
-                <option value="0,2,1">${labels[0]} → ${labels[2]} → ${labels[1]}</option>
-                <option value="1,0,2">${labels[1]} → ${labels[0]} → ${labels[2]}</option>
-                <option value="1,2,0">${labels[1]} → ${labels[2]} → ${labels[0]}</option>
-                <option value="2,0,1">${labels[2]} → ${labels[0]} → ${labels[1]}</option>
-                <option value="2,1,0">${labels[2]} → ${labels[1]} → ${labels[0]}</option>
-            `;
-            } else {
-                const allPermutations = this._generatePermutations(groupCount);
-                const limitedPermutations = allPermutations.slice(0, 9);
-                const labels = this.options.groupOrder.map(col => this._getColLabel(col));
+            } else if(groupCount > 0) {
+                if(groupCount === 1) {
+                    showGroupingControls = false;
+                } else if(groupCount === 2) {
+                    const labels = this.options.groupOrder.map(col => this._getColLabel(col));
+                    selectOptions = `
+                    <option value="0,1">${labels[0]} → ${labels[1]}</option>
+                    <option value="1,0">${labels[1]} → ${labels[0]}</option>
+                `;
+                } else if(groupCount === 3) {
+                    const labels = this.options.groupOrder.map(col => this._getColLabel(col));
+                    selectOptions = `
+                    <option value="0,1,2">${labels[0]} → ${labels[1]} → ${labels[2]}</option>
+                    <option value="0,2,1">${labels[0]} → ${labels[2]} → ${labels[1]}</option>
+                    <option value="1,0,2">${labels[1]} → ${labels[0]} → ${labels[2]}</option>
+                    <option value="1,2,0">${labels[1]} → ${labels[2]} → ${labels[0]}</option>
+                    <option value="2,0,1">${labels[2]} → ${labels[0]} → ${labels[1]}</option>
+                    <option value="2,1,0">${labels[2]} → ${labels[1]} → ${labels[0]}</option>
+                `;
+                } else {
+                    const allPermutations = this._generatePermutations(groupCount);
+                    const limitedPermutations = allPermutations.slice(0, 9);
+                    const labels = this.options.groupOrder.map(col => this._getColLabel(col));
 
-                limitedPermutations.forEach(perm => {
-                    const permLabels = perm.map(i => labels[i]);
-                    const permValue = perm.join(',');
-                    selectOptions += `<option value="${permValue}">${permLabels.join(' → ')}</option>`;
-                });
+                    limitedPermutations.forEach(perm => {
+                        const permLabels = perm.map(i => labels[i]);
+                        const permValue = perm.join(',');
+                        selectOptions += `<option value="${permValue}">${permLabels.join(' → ')}</option>`;
+                    });
+                }
             }
+        }
+
+        // Add Ledger Option if configured
+        if (this.options.ledger) {
+            const isSelected = (this.options.groupOrder.length === 0) ? 'selected' : '';
+            // If groupCount was 1 (hiding controls), force show if ledger exists
+            if (!showGroupingControls && this.options.groupOrder.length > 0) showGroupingControls = true;
+            // Also enable controls if we are currently IN ledger mode
+            if (!showGroupingControls && isSelected) showGroupingControls = true;
+
+            selectOptions += `<option value="__LEDGER__" ${isSelected}>${this.options.ledger.label}</option>`;
         }
 
         const groupingControlsHTML = showGroupingControls ? `
@@ -206,6 +264,7 @@ class DrillDowner {
         // Add event listeners for breadcrumb items
         const breadcrumbItems = this.controls.querySelectorAll('.drillDowner_breadcrumb_item');
         breadcrumbItems.forEach(item => {
+            if(!item.dataset.level) return;
             item.addEventListener('click', (e) => {
                 this.collapseToLevel(parseInt(e.currentTarget.dataset.level));
             });
@@ -232,16 +291,33 @@ class DrillDowner {
             const groupOrderSelect = this.controls.querySelector('#' + idPrefix + 'grouporder');
             if (groupOrderSelect) {
                 groupOrderSelect.addEventListener('change', (e) => {
-                    if (this.options.groupOrderCombinations) {
-                        const selectedIndex = parseInt(e.target.value);
-                        if (selectedIndex >= 0 && selectedIndex < this.options.groupOrderCombinations.length) {
-                            const newOrder = this.options.groupOrderCombinations[selectedIndex];
-                            this.changeGroupOrder(newOrder);
-                        }
+                    const val = e.target.value;
+
+                    if (val === '__LEDGER__') {
+                        // Switch to Ledger Mode: Clear groups and Render
+                        // render() will handle the column switching
+                        this.options.groupOrder = [];
+                        this.render();
                     } else {
-                        const indices = e.target.value.split(',').map(i => parseInt(i));
-                        const newOrder = indices.map(i => this.options.groupOrder[i]);
-                        this.changeGroupOrder(newOrder);
+                        // Switch to Standard Grouping Mode
+                        if (this.options.groupOrderCombinations) {
+                            const selectedIndex = parseInt(val);
+                            if (selectedIndex >= 0 && selectedIndex < this.options.groupOrderCombinations.length) {
+                                const newOrder = this.options.groupOrderCombinations[selectedIndex];
+                                this.changeGroupOrder(newOrder);
+                            }
+                        } else {
+                            const indices = val.split(',').map(i => parseInt(i));
+                            // Fallback if we have no groupOrder history: use default logic if possible
+                            // Note: If coming from Ledger and using permutations, this might fail if groupOrder was cleared.
+                            // But permutations rely on indices of CURRENT groupOrder.
+                            // If groupOrder is [], indices logic breaks.
+                            // *Assumption*: When using Permutations/Indices, one must avoid Ledger mode or provide combinations.
+                            if(this.options.groupOrder.length > 0) {
+                                const newOrder = indices.map(i => this.options.groupOrder[i]);
+                                this.changeGroupOrder(newOrder);
+                            }
+                        }
                     }
                 });
             }
@@ -251,7 +327,7 @@ class DrillDowner {
     }
 
     _updateBreadcrumbArrows(level = 0) {
-        if(!this.controls) return;
+        if(!this.controls || this.options.groupOrder.length === 0) return;
 
         const arrows = this.controls.querySelectorAll('.drillDowner_breadcrumb_arrow');
 
@@ -299,6 +375,13 @@ class DrillDowner {
 
     _renderAZBar() {
         if(!this.azBar) return;
+
+        // Ledger mode: clear AZ bar or handle differently
+        if (this.options.groupOrder.length === 0) {
+            this.azBar.innerHTML = '';
+            return;
+        }
+
         const groupCol = this._getGroupCol(0);
         const presentLetters = new Set(this.dataArr.map(x => (x[groupCol]||"")[0]?.toUpperCase()));
         let html = '';
@@ -326,7 +409,7 @@ class DrillDowner {
 
     _renderTable() {
         this.container.innerHTML = '';
-        const groupCols = ["Item"];
+        const groupCols = this.options.groupOrder.length > 0 ? ["Item"] : ["#"];
 
         // Build total headers using colProperties
         const totalHeaders = this.options.totals.map(totalCol => {
@@ -382,8 +465,18 @@ class DrillDowner {
         // ---- Build Table Body ----
         const rows = [];
         this.azAnchoredLetters = new Set();
-        this._sortAsc(this.dataArr, this.options.groupOrder);
-        this._buildFlatRows(this.dataArr, this.options.groupOrder, 0, {}, rows);
+
+        // --- STRATEGY BRANCHING ---
+        if (this.options.groupOrder.length === 0 && this.options.ledger) {
+            // LEDGER MODE
+            this._sortAsc(this.dataArr, this.options.ledger.sort);
+            this._buildNoGroupRows(this.dataArr, rows);
+        } else {
+            // GROUPED MODE
+            this._sortAsc(this.dataArr, this.options.groupOrder);
+            this._buildFlatRows(this.dataArr, this.options.groupOrder, 0, {}, rows);
+        }
+
         const tbody = document.createElement('tbody');
         rows.forEach(row => tbody.appendChild(row));
 
@@ -443,6 +536,23 @@ class DrillDowner {
         this.table = table;
     }
 
+    _buildNoGroupRows(dataArr, rows) {
+        dataArr.forEach((item, index) => {
+            const tr = document.createElement('tr');
+            tr.className = index % 2 === 1 ? 'drillDowner_even' : '';
+
+            // 1. Counter Column
+            const tdName = document.createElement('td');
+            tdName.innerHTML = `<span class="drillDowner_indent_0">${index + 1}</span>`;
+            tr.appendChild(tdName);
+
+            // 2. Data Cells
+            this._appendDataCells(tr, item, null, true);
+
+            rows.push(tr);
+        });
+    }
+
     _buildFlatRows(dataArr, groupOrder, level, parentKeys, rows) {
         if(level >= groupOrder.length) return;
         const groupCol = this._getGroupCol(level);
@@ -500,16 +610,33 @@ class DrillDowner {
             firstCell.innerHTML = anchorHtml + label;
             tr.appendChild(firstCell);
 
-            // ---- Totals columns using colProperties ----
-            this.options.totals.forEach(totalCol => {
-                const decimals = this._getColDecimals(totalCol);
-                const subTotalBy = this._getColProperty(totalCol, 'subTotalBy');
+            // Determine if leaf (visual or logic)
+            const isLeaf = (level === groupOrder.length - 1) && (groupData.length === 1);
+            const representativeItem = groupData.length > 0 ? groupData[0] : {};
 
-                const td = document.createElement('td');
-                td.className = 'drillDowner_num';
+            this._appendDataCells(tr, representativeItem, groupData, isLeaf);
 
+            rows.push(tr);
+
+            if(level < groupOrder.length - 1) {
+                this._buildFlatRows(groupData, groupOrder, level + 1, {...parentKeys, [groupCol]: key}, rows);
+            }
+        });
+    }
+
+    _appendDataCells(tr, item, groupData = null, isLeaf = false) {
+        // ---- Totals columns using colProperties ----
+        this.options.totals.forEach(totalCol => {
+            const decimals = this._getColDecimals(totalCol);
+            const subTotalBy = this._getColProperty(totalCol, 'subTotalBy');
+
+            const td = document.createElement('td');
+            td.className = 'drillDowner_num';
+
+            if(groupData) {
+                // Aggregation Logic
                 if(!subTotalBy) {
-                    const sum = groupData.reduce((a, b) => a + (b[totalCol] || 0), 0);
+                    const sum = groupData.reduce((a, b) => a + (Number( b[totalCol]) || 0), 0);
                     td.innerHTML = DrillDowner.formatNumber(sum, decimals);
                 } else {
                     const subtotals = {};
@@ -517,59 +644,58 @@ class DrillDowner {
                         const k = row[subTotalBy];
                         const hasKey = k === null ? false : true;
                         if(row[totalCol] != null && hasKey) {
-                            subtotals[k] = (subtotals[k] || 0) + row[totalCol];
+                            subtotals[k] = (Number( subtotals[k]) || 0) + Number( row[totalCol]);
                         }
                     });
                     td.innerHTML = Object.entries(subtotals)
                         .map(([sub, val]) => DrillDowner.formatNumber(val, decimals) + " " + sub)
                         .join(', ') || '-';
                 }
+            } else {
+                // Direct logic (Leaf or Ledger)
+                const val = Number(item[totalCol]) || 0;
+                td.innerHTML = DrillDowner.formatNumber(val, decimals);
+            }
 
-                tr.appendChild(td);
-            });
+            tr.appendChild(td);
+        });
 
-            // ---- Display columns using colProperties ----
-            this.options.columns.forEach(col => {
-                const togglesUp = this._getColTogglesUp(col);
-                const cellClass = this._getColClass(col);
-                const formatter = this._getColFormatter(col);
+        // ---- Display columns using colProperties ----
+        this.options.columns.forEach(col => {
+            const togglesUp = this._getColTogglesUp(col);
+            const cellClass = this._getColClass(col);
+            const formatter = this._getColFormatter(col);
 
-                const td = document.createElement('td');
-                td.className = cellClass;
+            const td = document.createElement('td');
+            td.className = cellClass;
 
-                if(togglesUp) {
-                    const uniqueValues = new Set();
-                    for (const row of groupData) {
-                        let val = (col in row) ? row[col] : '';
-                        if(formatter && typeof formatter === 'function') {
-                            val = formatter(val, row);
-                        }
-                        if(val && val !== "") {
-                            uniqueValues.add(val);
-                        }
+            if(groupData && togglesUp) {
+                // Aggregation (Unique Values)
+                const uniqueValues = new Set();
+                for (const row of groupData) {
+                    let val = (col in row) ? row[col] : '';
+                    if(formatter && typeof formatter === 'function') {
+                        val = formatter(val, row);
                     }
-                    td.innerHTML = Array.from(uniqueValues).join(', ');
-                } else {
-                    if(level === groupOrder.length - 1 && groupData.length === 1) {
-                        const item = groupData[0];
-                        let val = (col in item) ? item[col] : '';
-                        if(formatter && typeof formatter === 'function') {
-                            val = formatter(val, item);
-                        }
-                        td.innerHTML = val;
-                    } else {
-                        td.innerHTML = '';
+                    if(val && val !== "") {
+                        uniqueValues.add(val);
                     }
                 }
-
-                tr.appendChild(td);
-            });
-
-            rows.push(tr);
-
-            if(level < groupOrder.length - 1) {
-                this._buildFlatRows(groupData, groupOrder, level + 1, {...parentKeys, [groupCol]: key}, rows);
+                td.innerHTML = Array.from(uniqueValues).join(', ');
+            } else {
+                // Standard Logic: Show if Leaf, or if Ledger mode (groupData is null)
+                if(!groupData || isLeaf) {
+                    let val = (col in item) ? item[col] : '';
+                    if(formatter && typeof formatter === 'function') {
+                        val = formatter(val, item);
+                    }
+                    td.innerHTML = val;
+                } else {
+                    td.innerHTML = '';
+                }
             }
+
+            tr.appendChild(td);
         });
     }
 
@@ -632,6 +758,7 @@ class DrillDowner {
      * @returns {Array<Object>} The sorted array
      */
     _sortAsc(arr, keys) {
+        if(!keys || keys.length === 0) return arr;
         const cmp = this._natSort;
         arr.sort((a, b) => {
             for (let key of keys) {

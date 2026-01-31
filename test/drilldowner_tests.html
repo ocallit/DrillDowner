@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DrillDowner QUnit Test Suite</title>
+    <title>DrillDowner QUnit 2</title>
 
     <!-- QUnit CSS and JS -->
     <link rel="stylesheet" href="../tools/qunit-2.24.1.css">
@@ -504,15 +504,16 @@
         document.querySelector(controls).innerHTML = '';
 
         const combinations = [
-            ['p', 'c'],
-            ['c', 'p']
-                ['c', 'p', 'w'],
-            ['w', 'p', 'c'],
-            ['p', 'w', 'c']
+            ['p', 'c'],        // 0 product -> color
+            ['c', 'p'],        // 1 color -> product
+            ['c', 'p', 'w'],   // 2 color -> product -> warehouse
+            ['w', 'p', 'c'],   // 3 warehouse -> product -> color
+            ['p', 'w', 'c']    // 4 product -> warehouse -> color
         ];
 
+        // Start grouped by COLOR (so the first assertion matches reality)
         const drillDowner = new DrillDowner(container, testData, {
-            groupOrder: combinations[0],
+            groupOrder: combinations[1],
             groupOrderCombinations: combinations,
             columns: ['status'],
             totals: ['rolls'],
@@ -521,22 +522,32 @@
         });
 
         // verify initial grouping by color
-        const firstLevelLabels = Array.from(document.querySelectorAll(container + ' tbody tr[data-level="0"] td:first-child')).map(td => td.textContent);
+        const firstLevelLabels = Array.from(
+            document.querySelectorAll(container + ' tbody tr[data-level="0"] td:first-child')
+        ).map(td => td.textContent);
+
         const colorNames = ['Rojo', 'Azul', 'Verde', 'Amarillo', 'Naranja', 'Naranja2'];
         assert.ok(firstLevelLabels.some(l => colorNames.some(c => l.includes(c))), 'Initial grouping by color');
 
         const select = document.querySelector(controls + ' select');
-        select.value = '1';
+        assert.ok(select, 'Select exists');
+
+        // switch to WAREHOUSE-first (index 3)
+        select.value = '3';
         select.dispatchEvent(new Event('change'));
 
-        assert.deepEqual(drillDowner.options.groupOrder, combinations[1], 'Group order changed via combinations');
+        assert.deepEqual(drillDowner.options.groupOrder, combinations[3], 'Group order changed via combinations');
 
-        const firstLevelAfter = Array.from(document.querySelectorAll(container + ' tbody tr[data-level="0"] td:first-child')).map(td => td.textContent);
+        const firstLevelAfter = Array.from(
+            document.querySelectorAll(container + ' tbody tr[data-level="0"] td:first-child')
+        ).map(td => td.textContent);
+
         const warehouseNames = ['W1', 'W2', 'W3'];
         assert.ok(firstLevelAfter.some(l => warehouseNames.some(w => l.includes(w))), 'Rows regrouped by warehouse');
 
         drillDowner.destroy();
     });
+
 
 
     QUnit.module('DrillDowner AZ Bar', function() {
@@ -1393,6 +1404,132 @@
 
             drillDowner.destroy();
         });
+    });
+
+    QUnit.module('DrillDowner Ledger Mode', function() {
+
+        QUnit.module('DrillDowner Ledger Mode', function() {
+
+            QUnit.test('Ledger Mode: Initialization with specific cols and sort', function(assert) {
+                const container = '#test-container';
+                const controls = '#test-controls';
+                document.querySelector(container).innerHTML = '';
+                document.querySelector(controls).innerHTML = '';
+
+                // Configuration for Cardex (Ledger)
+                const ledgerConfig = {
+                    label: "Cardex View",
+                    cols: ["c", "p"], // Show Color then Product
+                    sort: ["c", "p"]  // Sort by Color then Product
+                };
+
+                // Use spread [...testData] to avoid side-effects
+                const drillDowner = new DrillDowner(container, [...testData], {
+                    groupOrder: [], // Start in Ledger Mode
+                    ledger: ledgerConfig,
+                    columns: ["status"], // Standard mode column (should NOT appear in Ledger mode)
+                    totals: ["rolls"],
+                    controlsSelector: controls,
+                    colProperties: testColProperties
+                });
+
+                // 1. Verify Dropdown Label matches ledger.label
+                const select = document.querySelector(controls + ' select');
+                const selectedOption = select.options[select.selectedIndex];
+                assert.equal(selectedOption.text, "Cardex View", "Dropdown uses the custom Ledger Label");
+
+                // 2. Verify Column Visibility
+                // In Ledger mode, we defined cols: ["c", "p"]. Plus the ID col and Total col.
+                // Headers: #, Rollos (Total), Color (c), Producto (p)
+                const headers = Array.from(document.querySelectorAll(container + ' thead th')).map(th => th.textContent.trim());
+
+                // Note: Total "Rollos" is always index 1 (after #). Data cols follow.
+                assert.ok(headers.some(h => h.includes('Color')), "Color column is present (from ledger.cols)");
+                assert.ok(headers.some(h => h.includes('Producto')), "Product column is present (from ledger.cols)");
+                assert.notOk(headers.some(h => h.includes('Estado')), "Status column is absent (configured in standard columns only)");
+
+                // 3. Verify Sorting (Sort by Color ["c"])
+                // Colors: Amarillo, Azul, Naranja, Naranja, Naranja2, Rojo, Rojo, Rojo, Verde
+                const firstDataRow = document.querySelector(container + ' tbody tr:first-child');
+                const rowText = firstDataRow.textContent;
+
+                // "Amarillo" should be first if sorted by Color alphabetically
+                // (testData has 'Amarillo' for product Delta)
+                assert.ok(rowText.includes('Amarillo'), `First row contains 'Amarillo' (Sorted by Color). Found: ${rowText}`);
+
+                drillDowner.destroy();
+            });
+
+            QUnit.test('Ledger Mode: Switching between Standard and Ledger (Cardex)', function(assert) {
+                const container = '#test-container';
+                const controls = '#test-controls';
+                document.querySelector(container).innerHTML = '';
+                document.querySelector(controls).innerHTML = '';
+
+                const ledgerConfig = {
+                    label: "Cardex",
+                    cols: ["c"],     // Ledger shows Color
+                    sort: ["c"]      // Ledger sorts by Color
+                };
+
+                const combinations = [['p']]; // Standard groups by Product
+
+                const drillDowner = new DrillDowner(container, [...testData], {
+                    groupOrder: combinations[0],
+                    groupOrderCombinations: combinations,
+                    ledger: ledgerConfig,
+                    columns: ["status"], // Standard shows Status
+                    totals: ["rolls"],
+                    controlsSelector: controls,
+                    colProperties: testColProperties
+                });
+
+                // --- PHASE 1: Standard Group Mode ---
+                // Grouped by Product. Sorted by Product (Alpha first).
+                let firstRow = document.querySelector(container + ' tbody tr');
+                assert.ok(firstRow.textContent.includes('Alpha'), 'Standard Mode: Starts with Alpha (Sorted by Product)');
+
+                // Check Columns: Should have "Status"
+                let headerText = document.querySelector(container + ' thead').textContent;
+                assert.ok(headerText.includes('Estado'), 'Standard Mode: Shows Status column');
+                assert.notOk(headerText.includes('Color'), 'Standard Mode: Does NOT show Color column');
+
+                // --- PHASE 2: Switch to Cardex (Ledger) ---
+                const select = document.querySelector(controls + ' select');
+                if (select) {
+                    // Select value "__LEDGER__"
+                    select.value = "__LEDGER__";
+                    select.dispatchEvent(new Event('change'));
+
+                    // Verify Sort: Should be by Color (Amarillo first)
+                    firstRow = document.querySelector(container + ' tbody tr');
+                    assert.ok(firstRow.textContent.includes('Amarillo'), 'Ledger Mode: Starts with Amarillo (Sorted by Color)');
+
+                    // Verify Columns: Should have "Color", NOT "Status"
+                    headerText = document.querySelector(container + ' thead').textContent;
+                    assert.ok(headerText.includes('Color'), 'Ledger Mode: Shows Color column');
+                    assert.notOk(headerText.includes('Estado'), 'Ledger Mode: Does NOT show Status column');
+                }
+
+                // --- PHASE 3: Switch Back to Standard ---
+                if (select) {
+                    select.value = "0"; // Index 0 (Product group)
+                    select.dispatchEvent(new Event('change'));
+
+                    // Verify Sort: Back to Alpha
+                    firstRow = document.querySelector(container + ' tbody tr');
+                    assert.ok(firstRow.textContent.includes('Alpha'), 'Back to Standard: Starts with Alpha');
+
+                    // Verify Columns: Back to Status
+                    headerText = document.querySelector(container + ' thead').textContent;
+                    assert.ok(headerText.includes('Estado'), 'Back to Standard: Shows Status column');
+                }
+
+                drillDowner.destroy();
+            });
+
+        });
+
     });
 
     // Start QUnit

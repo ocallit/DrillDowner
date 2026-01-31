@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DrillDowner Example</title>
+    <link href="../src/drilldowner.css" rel="stylesheet" type="text/css"/>
+    <script src="../src/DrillDowner.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            display: flex;
+            flex-direction: row;
+            gap: 20px;
+        }
+        .main-content {
+            flex: 1;
+        }
+        .sidebar {
+            width: 50px;
+        }
+        .controls {
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+        }
+        h1 {
+            color: #333;
+        }
+        h2 {
+            color: #555;
+            margin-top: 30px;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        code {
+            font-family: Consolas, Monaco, 'Andale Mono', monospace;
+        }
+        .note {
+            background-color: #fffde7;
+            padding: 10px;
+            border-left: 4px solid #ffd600;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+<h1>DrillDowner - Example</h1>
+<p>Use the dropdown below to switch between hierarchical grouping and the <b>Flat Inventory</b> ledger mode.</p>
+
+<div class="controls" id="table-controls"></div>
+<div class="container">
+    <div class="sidebar" id="az-bar"></div>
+    <div class="main-content" id="table-container"></div>
+</div>
+
+<script>
+    const sampleData = [
+        { category: "Electronics", product: "Smartphone", brand: "Apple", quantity: 15, price: 999.99, info:"New Model" },
+        { category: "Electronics", product: "Smartphone", brand: "Samsung", quantity: 20, price: 899.99, info:"Best Seller" },
+        { category: "Electronics", product: "Laptop", brand: "Dell", quantity: 8, price: 1299.99, info:"Enterprise" },
+        { category: "Electronics", product: "Laptop", brand: "HP", quantity: 12, price: 1199.99, info:"Home Office" },
+        { category: "Electronics", product: "Tablet", brand: "Apple", quantity: 10, price: 599.99, info:"Edu discount" },
+        { category: "Electronics", product: "Tablet", brand: "Samsung", quantity: 15, price: 499.99, info:"Lite version" },
+        { category: "Books", product: "Fiction", brand: "Penguin", quantity: 30, price: 15.99, info:"Paperback" },
+        { category: "Books", product: "Fiction", brand: "HarperCollins", quantity: 25, price: 14.99, info:"Hardcover" },
+        { category: "Books", product: "Non-Fiction", brand: "Penguin", quantity: 20, price: 19.99, info:"Biography" },
+        { category: "Books", product: "Non-Fiction", brand: "HarperCollins", quantity: 15, price: 18.99, info:"History" },
+        { category: "Clothing", product: "Shirts", brand: "Nike", quantity: 40, price: 29.99, info:"Dri-fit" },
+        { category: "Clothing", product: "Shirts", brand: "Adidas", quantity: 35, price: 27.99, info:"Cotton" },
+        { category: "Clothing", product: "Pants", brand: "Nike", quantity: 30, price: 39.99, info:"Running" },
+        { category: "Clothing", product: "Pants", brand: "Adidas", quantity: 25, price: 37.99, info:"Training" }
+    ];
+
+    // Column properties
+    const colProperties = {
+        category: {
+            label: "Category",
+            icon: "📁"
+        },
+        product: {
+            label: "Product",
+            icon: "📦"
+        },
+        brand: {
+            label: "Brand",
+            icon: "🏷️"
+        },
+        info: {
+            label: "Notes",
+            icon: "📝"
+        },
+        quantity: {
+            label: "Qty",
+            decimals: 0,
+            class: "text-right"
+        },
+        price: {
+            label: "Price",
+            decimals: 2,
+            class: "text-right",
+            formatter: function(value) {
+                return "$" + value;
+            }
+        }
+    };
+
+    // Initialize DrillDowner
+    document.addEventListener('DOMContentLoaded', function() {
+        const drillDowner = new DrillDowner('#table-container', sampleData, {
+            // Standard Grouping Configuration
+            groupOrder: ["category", "brand", "product"],
+            groupOrderCombinations:[
+                ["category", "brand"],
+                ["brand", "product"]
+            ],
+            columns: ["info"], // In grouped mode, we only show 'info'
+            totals: ["price", "quantity"], // These always appear
+            colProperties: colProperties,
+
+            // NEW: Ledger Configuration (No Grouping)
+            ledger: {
+                label: "Ledger",
+                // In ledger mode, we explicitly show the fields that were previously used for grouping
+                cols: ["category", "brand", "product", "info"],
+                // We can also enforce a specific sort order for the flat list
+                sort: ["product", "brand"]
+            },
+
+            controlsSelector: '#table-controls',
+            azBarSelector: '#az-bar'
+        });
+        console.log("drillDowner initialized", drillDowner);
+    });
+</script>
+</body>
+</html>
