@@ -1,4 +1,5 @@
 class DrillDowner {
+    // version 1.1.0
     constructor(container, dataArr, options = {}) {
         // Handle container as either DOM element or selector string
         this.container = typeof container === 'string' ? document.querySelector(container) : container;
