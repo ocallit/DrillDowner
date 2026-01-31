@@ -55,7 +55,7 @@
 </head>
 <body>
 <h1>DrillDowner - Example</h1>
-<p>Use the dropdown below to switch between hierarchical grouping and the <b>Flat Inventory</b> ledger mode.</p>
+<p>Use the dropdown below to switch between hierarchical grouping and the <b>Flat Inventory</b> ledger modes.</p>
 
 <div class="controls" id="table-controls"></div>
 <div class="container">
@@ -127,14 +127,21 @@
             totals: ["price", "quantity"], // These always appear
             colProperties: colProperties,
 
-            // NEW: Ledger Configuration (No Grouping)
-            ledger: {
-                label: "Ledger",
-                // In ledger mode, we explicitly show the fields that were previously used for grouping
-                cols: ["category", "brand", "product", "info"],
-                // We can also enforce a specific sort order for the flat list
-                sort: ["product", "brand"]
-            },
+            // NEW: Ledger Array Configuration (Multiple Flat Reports)
+            ledger: [
+                {
+                    label: "Global Inventory (Detailed)",
+                    // Show full context: Category -> Brand -> Product
+                    cols: ["category", "brand", "product", "info"],
+                    sort: ["category", "product"]
+                },
+                {
+                    label: "Brand Overview (Simple)",
+                    // Focus only on Brand and Product
+                    cols: ["brand", "product", "info"],
+                    sort: ["brand", "product"]
+                }
+            ],
 
             controlsSelector: '#table-controls',
             azBarSelector: '#az-bar'
