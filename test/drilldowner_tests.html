@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DrillDowner QUnit 1.1.0</title>
+    <title>DrillDowner QUnit 1.1.12</title>
 
     <!-- QUnit CSS and JS -->
     <link rel="stylesheet" href="../tools/qunit-2.24.1.css">
@@ -411,6 +411,47 @@
             drillDowner.destroy();
         });
 
+        QUnit.test('Group order selector works - Multiple Changes', function(assert) {
+            const container = '#test-container';
+            const controls = '#test-controls';
+            document.querySelector(container).innerHTML = '';
+            document.querySelector(controls).innerHTML = '';
+
+            const drillDowner = new DrillDowner(container, testData, {
+                groupOrder: ["p", "c", "w"], // Initial: Product -> Color -> Warehouse
+                columns: ["status"],
+                totals: ["rolls"],
+                colProperties: testColProperties,
+                controlsSelector: controls
+            });
+
+            const select = document.querySelector(controls + ' select');
+            assert.ok(select, 'Group selector should exist');
+
+            // --- CHANGE 1: Move Color to the first position ---
+            const order1 = 'c,p,w';
+            select.value = order1;
+            select.dispatchEvent(new Event('change'));
+
+            assert.deepEqual(drillDowner.options.groupOrder, ['c', 'p', 'w'], 'First change: Internal state updated to Color first');
+
+            let breadcrumbs = document.querySelectorAll(controls + ' .drillDowner_breadcrumb_item');
+            assert.equal(breadcrumbs[0].textContent.trim(), 'Color', 'First breadcrumb structurally updated to Color');
+
+            // --- CHANGE 2: Move Warehouse to the first position ---
+            const order2 = 'w,c,p';
+            select.value = order2;
+            select.dispatchEvent(new Event('change'));
+
+            assert.deepEqual(drillDowner.options.groupOrder, ['w', 'c', 'p'], 'Second change: Internal state updated to Warehouse first');
+
+            breadcrumbs = document.querySelectorAll(controls + ' .drillDowner_breadcrumb_item');
+            assert.equal(breadcrumbs[0].textContent.trim(), 'Almacén', 'Breadcrumbs erased and reset: First item is now Warehouse');
+            assert.equal(breadcrumbs.length, 3, 'Breadcrumb count remains correct after multiple erasures');
+
+            drillDowner.destroy();
+        });
+
         QUnit.test('Group order selector works', function(assert) {
             const container = '#test-container';
             const controls = '#test-controls';
@@ -426,16 +467,27 @@
             });
 
             const select = document.querySelector(controls + ' select');
-            if (select) {
-                // Change to a different grouping order
-                select.value = '1,0,2';
-                const event = new Event('change');
-                select.dispatchEvent(event);
+            assert.ok(select, 'Group selector should exist');
 
-                // Verify the order changed
-                assert.deepEqual(drillDowner.options.groupOrder, ['c', 'p', 'w'], 'Group order changed correctly');
-            } else {
-                assert.ok(true, 'No group selector (acceptable for some configurations)');
+            if (select) {
+                // NEW LOGIC: We now use key strings directly instead of numeric indices
+                // To change to Color (c) -> Product (p) -> Warehouse (w)
+                const targetValue = 'c,p,w';
+
+                select.value = targetValue;
+                select.dispatchEvent(new Event('change'));
+
+                // Verify the internal state updated to match the key-string selection
+                assert.deepEqual(
+                    drillDowner.options.groupOrder,
+                    ['c', 'p', 'w'],
+                    'Group order changed correctly via key-based value'
+                );
+
+                // Verify that breadcrumbs were structuraly updated (cleared and reset)
+                const breadcrumbs = document.querySelectorAll(controls + ' .drillDowner_breadcrumb_item');
+                assert.equal(breadcrumbs.length, 3, 'Breadcrumb count remains correct for new grouping');
+                assert.equal(breadcrumbs[0].textContent.trim(), 'Color', 'First breadcrumb matches new order');
             }
 
             drillDowner.destroy();
@@ -1609,6 +1661,26 @@
         });
 
     });
+
+    QUnit.test('Persistence: Grouping select is NOT recreated on render', function(assert) {
+        const controls = '#test-controls';
+        const dd = new DrillDowner('#test-container', testData, {
+            groupOrder: ["p", "c"],
+            controlsSelector: controls
+        });
+
+        const selectBefore = document.querySelector(controls + ' select');
+        selectBefore.setAttribute('data-integrity-check', 'still-here');
+
+        // Trigger a change that would normally cause a full re-render
+        dd.render();
+
+        const selectAfter = document.querySelector(controls + ' select');
+        assert.strictEqual(selectBefore, selectAfter, 'The DOM reference for the select element must remain identical');
+        assert.equal(selectAfter.getAttribute('data-integrity-check'), 'still-here', 'Select options and attributes were not wiped');
+        dd.destroy();
+    });
+
 
     // Start QUnit
     QUnit.start();
