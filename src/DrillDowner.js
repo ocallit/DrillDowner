@@ -1,5 +1,6 @@
 class DrillDowner {
-    // version 1.1.12 - Finalized Key-Based Persistence
+    static version = '1.1.13';
+
     constructor(container, dataArr, options = {}) {
         this.container = typeof container === 'string' ? document.querySelector(container) : container;
         this.dataArr = dataArr;
@@ -69,12 +70,23 @@ class DrillDowner {
         const targetValue = newOrder.join(',');
         let found = false;
 
-        // Search through existing options (handles both key-strings and combination indices)
-        for (let i = 0; i < select.options.length; i++) {
-            if (select.options[i].value === targetValue) {
-                select.selectedIndex = i;
-                found = true;
-                break;
+        // If using groupOrderCombinations, first check if newOrder matches any combination
+        if (this.options.groupOrderCombinations) {
+            for (let i = 0; i < this.options.groupOrderCombinations.length; i++) {
+                if (this.options.groupOrderCombinations[i].join(',') === targetValue) {
+                    select.selectedIndex = i;
+                    found = true;
+                    break;
+                }
+            }
+        } else {
+            // Search by key-string value
+            for (let i = 0; i < select.options.length; i++) {
+                if (select.options[i].value === targetValue) {
+                    select.selectedIndex = i;
+                    found = true;
+                    break;
+                }
             }
         }
 
@@ -210,7 +222,13 @@ class DrillDowner {
                 this.options.columns = [...this._defaultColumns];
 
                 if (this.options.groupOrderCombinations) {
-                    this.options.groupOrder = this.options.groupOrderCombinations[parseInt(val)];
+                    // Check if value is an index (digits only) or a key-string
+                    if (/^\d+$/.test(val)) {
+                        this.options.groupOrder = this.options.groupOrderCombinations[parseInt(val)];
+                    } else {
+                        // Custom order added via changeGroupOrder - parse as key-string
+                        this.options.groupOrder = val.split(',');
+                    }
                 } else {
                     this.options.groupOrder = val.split(',');
                 }
@@ -420,7 +438,7 @@ class DrillDowner {
         let html = '';
         for (let i = 65; i <= 90; i++) {
             const c = String.fromCharCode(i);
-            html += letters.has(c) ? `<div><a href="#${this.options.idPrefix}az${c}" class="drillDowner_az_link">${c}</a></div>` : `<div class="drillDowner_az_dimmed">${c}</div>`;
+            html += letters.has(c) ? `<div><a href="#${this.options.idPrefix}az${c}" aria-label="Ir a la letra ${c}" class="drillDowner_az_link">${c}</a></div>` : `<div class="drillDowner_az_dimmed">${c}</div>`;
         }
         this.azBar.innerHTML = html;
         this.azBar.querySelectorAll('.drillDowner_az_link').forEach(a => a.onclick = () => this._onAZClick());
