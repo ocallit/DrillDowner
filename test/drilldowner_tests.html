@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DrillDowner QUnit 1.1.13</title>
+    <title>DrillDowner QUnit 1.1.14</title>
 
     <!-- QUnit CSS and JS -->
     <link rel="stylesheet" href="../tools/qunit-2.24.1.css">
@@ -204,6 +204,8 @@
             drillDowner.destroy();
         });
 
+
+
         QUnit.test('Drill icons are present at appropriate levels', function(assert) {
             const container = '#test-container';
             document.querySelector(container).innerHTML = '';
@@ -216,9 +218,11 @@
 
             const level0Rows = document.querySelectorAll(container + ' tr[data-level="0"]');
             const level1Rows = document.querySelectorAll(container + ' tr[data-level="1"]');
+            const level2Rows = document.querySelectorAll(container + ' tr[data-level="2"]');
 
             assert.ok(level0Rows.length > 0, 'Level 0 rows exist');
             assert.ok(level1Rows.length > 0, 'Level 1 rows exist');
+            assert.ok(level2Rows.length > 0, 'Level 2 rows exist');
 
             // Level 0 should have drill icons (can drill to level 1)
             let level0DrillIcons = 0;
@@ -227,12 +231,17 @@
             });
             assert.ok(level0DrillIcons > 0, 'Level 0 rows have drill icons');
 
-            // Level 1 should not have drill icons (last level)
+            // Level 1 should have drill icons (last level)
             let level1DrillIcons = 0;
             level1Rows.forEach(row => {
                 level1DrillIcons += row.querySelectorAll('.drillDowner_drill_icon').length;
             });
-            assert.equal(level1DrillIcons, 0, 'Level 1 rows do not have drill icons');
+            assert.ok(level1DrillIcons > 0, 'Level 1 rows have drill icons');
+
+            // Level 2 rows (detail/leaf) do not have drill icons
+            const table = drillDowner.getTable();
+            const level2Icons = table.querySelectorAll('tbody tr[data-level="2"] .drillDowner_drill_icon');
+            assert.equal(level2Icons.length, 0, "Level 2 (detail) rows do not have drill icons");
 
             drillDowner.destroy();
         });
@@ -280,14 +289,14 @@
             });
 
             // Initially collapsed to level 0
-            let visibleRows = Array.from(document.querySelectorAll(container + ' tbody tr')).filter(row => 
+            let visibleRows = Array.from(document.querySelectorAll(container + ' tbody tr')).filter(row =>
                 window.getComputedStyle(row).display !== 'none').length;
             let level0Rows = document.querySelectorAll(container + ' tr[data-level="0"]').length;
             assert.equal(visibleRows, level0Rows, 'Initially only level 0 rows are visible');
 
             // Expand to level 1
             drillDowner.collapseToLevel(1);
-            visibleRows = Array.from(document.querySelectorAll(container + ' tbody tr')).filter(row => 
+            visibleRows = Array.from(document.querySelectorAll(container + ' tbody tr')).filter(row =>
                 window.getComputedStyle(row).display !== 'none').length;
             level0Rows = document.querySelectorAll(container + ' tr[data-level="0"]').length;
             const level1Rows = document.querySelectorAll(container + ' tr[data-level="1"]').length;
@@ -295,7 +304,7 @@
 
             // Collapse back to level 0
             drillDowner.collapseToLevel(0);
-            visibleRows = Array.from(document.querySelectorAll(container + ' tbody tr')).filter(row => 
+            visibleRows = Array.from(document.querySelectorAll(container + ' tbody tr')).filter(row =>
                 window.getComputedStyle(row).display !== 'none').length;
             level0Rows = document.querySelectorAll(container + ' tr[data-level="0"]').length;
             assert.equal(visibleRows, level0Rows, 'Back to only level 0 rows visible');
@@ -315,48 +324,51 @@
 
             // Test expandAll
             drillDowner.expandAll();
-            const allVisibleRows = Array.from(document.querySelectorAll(container + ' tbody tr')).filter(row => 
+            var allVisibleRows = Array.from(document.querySelectorAll(container + ' tbody tr')).filter(row =>
                 window.getComputedStyle(row).display !== 'none').length;
-            const totalRows = document.querySelectorAll(container + ' tbody tr').length;
-            assert.equal(allVisibleRows, totalRows, 'expandAll shows all rows');
+            var totalRows = document.querySelectorAll(container + ' tbody tr').length;
+            assert.equal(allVisibleRows, totalRows, `expandAll shows all rows total rows=${totalRows} vs visble rows=${allVisibleRows}`);
 
             // Test collapseAll
             drillDowner.collapseAll();
-            const visibleRows = Array.from(document.querySelectorAll(container + ' tbody tr')).filter(row => 
+            const visibleRows = Array.from(document.querySelectorAll(container + ' tbody tr')).filter(row =>
                 window.getComputedStyle(row).display !== 'none').length;
             const level0Rows = document.querySelectorAll(container + ' tr[data-level="0"]').length;
-            assert.equal(visibleRows, level0Rows, 'collapseAll shows only level 0 rows');
+            assert.equal(visibleRows, level0Rows, `collapseAll shows only level 0 rows: level 0 rows=${level0Rows} vs visibleRows=${visibleRows}`);
+
 
             drillDowner.destroy();
         });
 
-        QUnit.test('Individual drill click functionality', function(assert) {
-            const container = '#test-container';
-            document.querySelector(container).innerHTML = '';
 
-            const drillDowner = new DrillDowner(container, testData, {
-                groupOrder: ["p", "c"],
-                columns: ["status"],
-                totals: ["rolls"]
-            });
+    });
 
-            // Find the first drill icon
-            const firstDrillIcon = document.querySelector(container + ' .drillDowner_drill_icon');
-            assert.ok(firstDrillIcon, 'Drill icon found');
-            assert.ok(firstDrillIcon.classList.contains('drillDowner_drill_collapsed'), 'Initially collapsed');
+    QUnit.test('Individual drill click functionality', function(assert) {
+        const container = '#test-container';
+        document.querySelector(container).innerHTML = '';
 
-            // Simulate click
-            firstDrillIcon.click();
-
-            // Check if it expanded
-            assert.ok(firstDrillIcon.classList.contains('drillDowner_drill_expanded'), 'Icon is now expanded');
-
-            // Click again to collapse
-            firstDrillIcon.click();
-            assert.ok(firstDrillIcon.classList.contains('drillDowner_drill_collapsed'), 'Icon is collapsed again');
-
-            drillDowner.destroy();
+        const drillDowner = new DrillDowner(container, testData, {
+            groupOrder: ["p", "c"],
+            columns: ["status"],
+            totals: ["rolls"]
         });
+
+        // Find the first drill icon
+        const firstDrillIcon = document.querySelector(container + ' .drillDowner_drill_icon');
+        assert.ok(firstDrillIcon, 'Drill icon found');
+        assert.ok(firstDrillIcon.classList.contains('drillDowner_drill_collapsed'), 'Initially collapsed');
+
+        // Simulate click
+        firstDrillIcon.click();
+
+        // Check if it expanded
+        assert.ok(firstDrillIcon.classList.contains('drillDowner_drill_expanded'), 'Icon is now expanded');
+
+        // Click again to collapse
+        firstDrillIcon.click();
+        assert.ok(firstDrillIcon.classList.contains('drillDowner_drill_collapsed'), 'Icon is collapsed again');
+
+        drillDowner.destroy();
     });
 
     QUnit.module('DrillDowner Controls', function() {
@@ -429,8 +441,7 @@
             assert.ok(select, 'Group selector should exist');
 
             // --- CHANGE 1: Move Color to the first position ---
-            const order1 = 'c,p,w';
-            select.value = order1;
+            select.value = 'c,p,w';
             select.dispatchEvent(new Event('change'));
 
             assert.deepEqual(drillDowner.options.groupOrder, ['c', 'p', 'w'], 'First change: Internal state updated to Color first');
@@ -439,8 +450,7 @@
             assert.equal(breadcrumbs[0].textContent.trim(), 'Color', 'First breadcrumb structurally updated to Color');
 
             // --- CHANGE 2: Move Warehouse to the first position ---
-            const order2 = 'w,c,p';
-            select.value = order2;
+            select.value = 'w,c,p';
             select.dispatchEvent(new Event('change'));
 
             assert.deepEqual(drillDowner.options.groupOrder, ['w', 'c', 'p'], 'Second change: Internal state updated to Warehouse first');
@@ -470,11 +480,8 @@
             assert.ok(select, 'Group selector should exist');
 
             if (select) {
-                // NEW LOGIC: We now use key strings directly instead of numeric indices
                 // To change to Color (c) -> Product (p) -> Warehouse (w)
-                const targetValue = 'c,p,w';
-
-                select.value = targetValue;
+                select.value = 'c,p,w';
                 select.dispatchEvent(new Event('change'));
 
                 // Verify the internal state updated to match the key-string selection
@@ -1117,11 +1124,16 @@
             assert.equal(visibleRows, level0And1Rows, 'Level 1 shows level 0 and 1 rows');
 
             // Test level 2
-            drillDowner.collapseToLevel(2);
+            drillDowner.collapseToLevel(3);
+            visibleRows = Array.from(document.querySelectorAll(container + ' tbody tr')).filter(row =>
+                window.getComputedStyle(row).display !== 'none').length;
+            assert.equal(visibleRows, 30, 'Level 2 shows all rows');
+            // Test level 3
+            drillDowner.collapseToLevel(3);
             visibleRows = Array.from(document.querySelectorAll(container + ' tbody tr')).filter(row => 
                 window.getComputedStyle(row).display !== 'none').length;
             let allLevelRows = document.querySelectorAll(container + ' tbody tr').length;
-            assert.equal(visibleRows, allLevelRows, 'Level 2 shows all rows');
+            assert.equal(visibleRows, allLevelRows, 'Level 3 shows all rows');
 
             drillDowner.destroy();
         });
@@ -1748,7 +1760,7 @@
             });
 
             const select = document.querySelector(controls + ' select');
-            const initialOptionCount = select.options.length;
+            // const initialOptionCount = select.options.length;
 
             // Change to an order that might not exist in permutations
             drillDowner.changeGroupOrder(['w', 'p', 'c']);

@@ -214,6 +214,7 @@ When true, shows aggregated/combined values at group levels (comma-separated uni
 
 - **Default:** `false`
 - **Example:** `{ "status": { togglesUp: true } }` shows "Active, Pending" for groups containing both statuses
+- colProperties.<col>.togglesUp = true makes that column “bubble up” to group rows, showing the distinct child values as a comma-separated list (instead of leaving the group cell blank).
 
 #### `formatter` (function)
 

@@ -49,6 +49,26 @@
 .drillDowner_az_link:hover { text-decoration: underline; background: #e0ecf6; border-radius: 4px; }
 .drillDowner_layout_container { display: flex; flex-direction: row; align-items: flex-start; }
 
+/* Horizontal AZ bar */
+.drillDowner_az_bar.drillDowner_az_bar_horizontal{
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+
+    /* remove the vertical-bar assumptions */
+    margin-right: 0;
+    max-height: none;
+    overflow-y: visible;
+
+    /* spacing / layout */
+    gap: 6px;
+}
+
+/* In horizontal mode, don't force fixed height blocks */
+.drillDowner_az_bar.drillDowner_az_bar_horizontal div{
+    height: auto;
+    width: auto;
+}
 
 
 /** controls & breadcrumbs **/

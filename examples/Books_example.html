@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>DrillDowner - Books Demo</title>
+    <link href="../src/drilldowner.css" rel="stylesheet" type="text/css"/>
+    <script src="../src/DrillDowner.js"></script>
+</head>
+<body>
+
+<h2>Books Drilldown</h2>
+
+<div id="ddControls"></div>
+<div>
+<div id="ddAzHIDE"></div>
+<div id="ddTable"></div>
+</div>
+<script>
+    // 1) Raw book rows
+    const books = [
+        { category: "Fiction",    subCategory: "Fantasy",  publishingHouse: "Penguin", title: "The Silver Road", author: "A. Vega", qty: 3, price: 19.99 },
+        { category: "Fiction",    subCategory: "Fantasy",  publishingHouse: "Penguin", title: "The Silver Road", author: "A. Vega", qty: 2, price: 19.99 },
+        { category: "Fiction",    subCategory: "Mystery",  publishingHouse: "Harper",  title: "Night Clues",     author: "L. Chen", qty: 4, price: 14.50 },
+        { category: "Nonfiction", subCategory: "History",  publishingHouse: "Harper",  title: "Old Empires",     author: "S. Karim", qty: 1, price: 29.00 },
+        { category: "Nonfiction", subCategory: "Science",  publishingHouse: "OReilly", title: "Data Atoms",      author: "M. Ito",  qty: 6, price: 39.95 },
+        { category: "Nonfiction", subCategory: "Science",  publishingHouse: "OReilly", title: "Data Atoms",      author: "M. Ito",  qty: 2, price: 39.95 },
+    ];
+
+    // 2) Add a computed numeric field for totals: totalValue = qty * price
+    const dataArr = books.map(r => ({
+        ...r,
+        totalValue: (Number(r.qty) || 0) * (Number(r.price) || 0),
+    }));
+
+    // 3) Formatters
+    const fmtMoney = (v) => {
+        const n = Number(v);
+        if (!isFinite(n)) return "";
+        return n.toLocaleString("en-US", { style: "currency", currency: "USD" });
+    };
+
+    // 4) Create DrillDowner
+    const dd = new DrillDowner("#ddTable", dataArr, {
+        // Totals columns (numeric aggregates)
+        totals: ["qty", "totalValue"],
+
+        // Non-total columns (shown as-is on detail rows; on group rows can optionally "toggle up")
+        columns: ["author", "price","totalValue"],
+
+        // Start order (any one of your combinations)
+        groupOrder: ["category", "publishingHouse", "subCategory", "title"],
+
+        // Provide EXACT group orders you want available in the select:
+        groupOrderCombinations: [
+            ["category", "publishingHouse", "subCategory", "title"],          // Category -> Publishing House -> SubCategory -> Title
+            ["publishingHouse", "category", "subCategory", "title"],          // Publishing House -> Category -> SubCategory -> Title
+            ["category", "subCategory", "publishingHouse", "title"],          // Category -> SubCategory -> Publishing House -> Title
+            ["publishingHouse"],                                              // Publishing House (only)
+        ],
+
+        // Hook the optional UI areas
+        controlsSelector: "#ddControls",
+        azBarSelector: "#ddAz",
+        azBarOrientation:"horizontal",
+        // Column metadata (labels, decimals, formatters, etc.)
+        colProperties: {
+            // Grouping labels
+            category:         { label: "Category" },
+            publishingHouse:  { label: "Publishing House" },
+            subCategory:      { label: "SubCategory" },
+            title:            { label: "Title" },
+
+            // Totals
+            qty:        { label: "Qty", decimals: 0 },
+            totalValue: { label: "Total Value", decimals: 2, formatter: (v) => fmtMoney(v) },
+
+            // Regular columns
+            author: { label: "Author", togglesUp: true }, // shows unique authors at group rows
+            price:  { label: "Unit Price", decimals: 2, formatter: (v) => fmtMoney(v) },
+        },
+
+        showGrandTotals: true,
+    });
+
+    dd.render();
+</script>
+</body>
+</html>

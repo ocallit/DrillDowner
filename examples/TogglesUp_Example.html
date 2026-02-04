@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+    <title>TogglesUp Example</title>
+    <link href="../src/drilldowner.css" rel="stylesheet" type="text/css"/>
+    <script src="../src/DrillDowner.js"></script>
+</head>
+<body>
+<h1>No togglesUp</h1>
+<div id="dd_off"></div>
+<hr>
+<h1>TogglesUp true</h1>
+<div id="dd_on"></div>
+<h1>Sample code</h1>
+<pre style="white-space:pre;margin:1em;padding:0.3em;border:1px blue solid;">
+
+       const data = [
+        { category: "Electronics", product: "Phone",  status: "Active",  qty: 10 },
+        { category: "Electronics", product: "Laptop", status: "Pending", qty: 5  },
+        { category: "Books",       product: "Novel",  status: "Active",  qty: 25 },
+        { category: "Books",       product: "Comics", status: "Inactive",qty: 3  },
+    ];
+
+    // 1) togglesUp OFF: group row cells for "status" are blank
+    new DrillDowner("#dd_off", data, {
+        groupOrder: ["category", "product"],
+
+        columns: [ "status"],
+        totals: ["qty"],
+        colProperties: {
+            category: { label: "Category" },
+            product:  { label: "Product" },
+            status:   { label: "Status" },          // togglesUp not enabled
+            qty:      { label: "Qty", decimals: 0 },
+        }
+    });
+
+    // 2) togglesUp ON: group row "status" shows combined unique statuses
+    new DrillDowner("#dd_on", data, {
+        groupOrder: ["category","product"],
+
+        columns: ["qty", "product", "status"],
+        totals: ["qty"],
+        colProperties: {
+            category: { label: "Category" },
+            product:  { label: "Product" },
+            status:   { label: "Status", togglesUp: true }, // <-- here
+            qty:      { label: "Qty", decimals: 0 },
+        }
+    });
+
+    /*
+    Expected effect in the grouped (Category) rows:
+    - Electronics status: "Active, Pending"
+    - Books status: "Active, Inactive"
+    */
+</pre>
+
+<script>
+    const data = [
+        { category: "Electronics", product: "Phone",  status: "Active",  qty: 10 },
+        { category: "Electronics", product: "Laptop", status: "Pending", qty: 5  },
+        { category: "Books",       product: "Novel",  status: "Active",  qty: 25 },
+        { category: "Books",       product: "Comics", status: "Inactive",qty: 3  },
+    ];
+
+    // 1) togglesUp OFF: group row cells for "status" are blank
+    new DrillDowner("#dd_off", data, {
+        groupOrder: ["category"],
+        columns: ["product", "status"],
+        totals: ["qty"],
+        colProperties: {
+            category: { label: "Category" },
+            product:  { label: "Product" },
+            status:   { label: "Status" },          // togglesUp not enabled
+            qty:      { label: "Qty", decimals: 0 },
+        }
+    });
+
+    // 2) togglesUp ON: group row "status" shows combined unique statuses
+    new DrillDowner("#dd_on", data, {
+        groupOrder: ["category"],
+        columns: ["product", "status"],
+        totals: ["qty"],
+        colProperties: {
+            category: { label: "Category" },
+            product:  { label: "Product" },
+            status:   { label: "Status", togglesUp: true }, // <-- here
+            qty:      { label: "Qty", decimals: 0 },
+        }
+    });
+
+    /*
+    Expected effect in the grouped (Category) rows:
+    - Electronics status: "Active, Pending"
+    - Books status: "Active, Inactive"
+    */
+</script>
+
+</body>
+</html>
