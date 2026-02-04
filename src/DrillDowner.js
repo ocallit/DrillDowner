@@ -348,19 +348,20 @@ class DrillDowner {
         Object.keys(grouped).forEach((key, i) => {
             const gData = grouped[key];
             const keys = groupOrder.slice(0, level + 1).map((c, idx) => idx === level ? key : parents[c]);
-            const rowId = this.options.idPrefix + "row_" + keys.join("_").replace(/\s/g, "_");
+            const sanitizedKeys = keys.map((value) => this._sanitizeIdPart(value));
+            const rowId = this.options.idPrefix + "row_" + sanitizedKeys.join("_");
 
             const tr = tbody.insertRow();
             tr.id = rowId;
             tr.setAttribute('data-level', level);
-            tr.setAttribute('data-parent', level === 0 ? "" : this.options.idPrefix + "row_" + groupOrder.slice(0, level).map(c => parents[c]).join("_").replace(/\s/g, "_"));
+            tr.setAttribute('data-parent', level === 0 ? "" : this.options.idPrefix + "row_" + groupOrder.slice(0, level).map(c => this._sanitizeIdPart(parents[c])).join("_"));
             if (i % 2) tr.classList.add('drillDowner_even');
             if (i === 0) tr.classList.add('drillDowner_first_group');
 
             let anchor = "";
             if (level === 0) {
                 const char = String(key)[0]?.toUpperCase();
-                if (char) anchor = `<span id="${this.options.idPrefix}az${char}"></span>`;
+                if (char) anchor = `<span id="${this.options.idPrefix}az${this._sanitizeIdPart(char)}"></span>`;
             }
 
             const cell = tr.insertCell();
@@ -408,6 +409,12 @@ class DrillDowner {
     _getColLabelClass(c) { return this._getColProperty(c, 'labelClass', ''); }
     _getColTogglesUp(c) { return this._getColProperty(c, 'togglesUp', false); }
     _getColFormatter(c) { return this._getColProperty(c, 'formatter', null); }
+    _sanitizeIdPart(value) {
+        return String(value ?? '')
+            .normalize('NFKD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-zA-Z0-9_-]/g, '_');
+    }
 
     _onDrillClick(e) {
         const icon = e.target;
@@ -438,7 +445,7 @@ class DrillDowner {
         let html = '';
         for (let i = 65; i <= 90; i++) {
             const c = String.fromCharCode(i);
-            html += letters.has(c) ? `<div><a href="#${this.options.idPrefix}az${c}" aria-label="Ir a la letra ${c}" class="drillDowner_az_link">${c}</a></div>` : `<div class="drillDowner_az_dimmed">${c}</div>`;
+            html += letters.has(c) ? `<div><a href="#${this.options.idPrefix}az${this._sanitizeIdPart(c)}" aria-label="Ir a la letra ${c}" class="drillDowner_az_link">${c}</a></div>` : `<div class="drillDowner_az_dimmed">${c}</div>`;
         }
         this.azBar.innerHTML = html;
         this.azBar.querySelectorAll('.drillDowner_az_link').forEach(a => a.onclick = () => this._onAZClick());
@@ -486,12 +493,16 @@ class DrillDowner {
         return clone;
     }
 
-    _generatePermutations(n) {
+    _generatePermutations(n, limit = 9) {
         const res = [];
         const p = (a, s = 0) => {
+            if (res.length >= limit) return;
             if (s === a.length - 1) { res.push([...a]); return; }
             for (let i = s; i < a.length; i++) {
-                [a[s], a[i]] = [a[i], a[s]]; p(a, s + 1); [a[s], a[i]] = [a[i], a[s]];
+                [a[s], a[i]] = [a[i], a[s]];
+                p(a, s + 1);
+                [a[s], a[i]] = [a[i], a[s]];
+                if (res.length >= limit) return;
             }
         };
         p(Array.from({length: n}, (_, i) => i));
