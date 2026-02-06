@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DrillDowner - Financial Balance Sheet</title>
+    <link href="../src/drilldowner.css" rel="stylesheet" type="text/css"/>
+    <script src="../src/DrillDowner.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 20px;
+            background-color: #f4f7f6;
+            color: #333;
+        }
+        .container {
+            display: flex;
+            gap: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            min-height: 600px;
+        }
+        .main-content {
+            flex: 1;
+            overflow-x: auto;
+        }
+        .sidebar {
+            width: 40px; /* Slim sidebar for A-Z */
+            padding-top: 40px;
+        }
+        .controls {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            border-left: 5px solid #2196F3;
+        }
+        h1 { margin-top: 0; color: #2c3e50; }
+
+        /* Custom Styling for Positive/Negative/Balance */
+        .money-in { color: #2e7d32; font-weight: 500; }
+        .money-out { color: #c62828; }
+        .balance-cell { font-weight: bold; color: #1565c0; }
+
+        /* Highlight the balance column background slightly */
+        td:last-child, th:last-child {
+            background-color: #f8fbff;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Financial Statement Example</h1>
+<p>
+    This demo shows the <b>Running Balance</b> feature.
+    In <b>Ledger Mode</b> (Bank Statement), the Balance accumulates row-by-row.
+    In <b>Group Mode</b> (Category Analysis), it shows the Net (In - Out).
+</p>
+
+<div class="controls" id="table-controls"></div>
+
+<div class="container">
+    <div class="sidebar" id="az-bar"></div>
+    <div class="main-content" id="table-container"></div>
+</div>
+
+<script>
+    // 1. Generate Realistic Financial Data
+    const transactions = [
+        // Income
+        { id: 101, date: "2023-10-01", category: "Income", type: "Salary", desc: "Monthly Salary", credit: 4500.00, debit: 0 },
+        { id: 105, date: "2023-10-05", category: "Income", type: "Freelance", desc: "Web Design Project", credit: 1200.00, debit: 0 },
+        { id: 115, date: "2023-10-15", category: "Income", type: "Investments", desc: "Stock Dividend", credit: 150.50, debit: 0 },
+
+        // Living Expenses
+        { id: 102, date: "2023-10-02", category: "Living", type: "Rent", desc: "October Rent", credit: 0, debit: 1800.00 },
+        { id: 103, date: "2023-10-03", category: "Living", type: "Utilities", desc: "Electric Bill", credit: 0, debit: 145.20 },
+        { id: 104, date: "2023-10-04", category: "Living", type: "Utilities", desc: "Water Bill", credit: 0, debit: 45.00 },
+        { id: 106, date: "2023-10-06", category: "Living", type: "Groceries", desc: "Supermarket Run", credit: 0, debit: 235.60 },
+        { id: 112, date: "2023-10-12", category: "Living", type: "Groceries", desc: "Weekend Supplies", credit: 0, debit: 115.40 },
+        { id: 120, date: "2023-10-20", category: "Living", type: "Internet", desc: "Fiber Optic", credit: 0, debit: 89.99 },
+
+        // Entertainment & Leisure
+        { id: 107, date: "2023-10-07", category: "Entertainment", type: "Dining", desc: "Dinner with Friends", credit: 0, debit: 85.00 },
+        { id: 108, date: "2023-10-08", category: "Entertainment", type: "Movies", desc: "Cinema Tickets", credit: 0, debit: 34.00 },
+        { id: 114, date: "2023-10-14", category: "Entertainment", type: "Subscription", desc: "Streaming Service", credit: 0, debit: 14.99 },
+        { id: 118, date: "2023-10-18", category: "Entertainment", type: "Dining", desc: "Pizza Night", credit: 0, debit: 45.50 },
+
+        // Transport
+        { id: 109, date: "2023-10-09", category: "Transport", type: "Fuel", desc: "Gas Station", credit: 0, debit: 65.00 },
+        { id: 116, date: "2023-10-16", category: "Transport", type: "Service", desc: "Oil Change", credit: 0, debit: 89.00 },
+        { id: 122, date: "2023-10-22", category: "Transport", type: "Fuel", desc: "Gas Station", credit: 0, debit: 62.50 },
+        { id: 125, date: "2023-10-25", category: "Transport", type: "Parking", desc: "City Parking", credit: 0, debit: 25.00 },
+
+        // Shopping
+        { id: 110, date: "2023-10-10", category: "Shopping", type: "Clothes", desc: "Winter Jacket", credit: 0, debit: 120.00 },
+        { id: 113, date: "2023-10-13", category: "Shopping", type: "Electronics", desc: "Headphones", credit: 0, debit: 199.99 },
+        { id: 128, date: "2023-10-28", category: "Shopping", type: "Home", desc: "Kitchenware", credit: 0, debit: 55.00 },
+
+        // Miscellaneous
+        { id: 126, date: "2023-10-26", category: "Misc", type: "Gift", desc: "Birthday Gift", credit: 0, debit: 50.00 },
+        { id: 127, date: "2023-10-27", category: "Income", type: "Refund", desc: "Tax Return", credit: 320.00, debit: 0 },
+        { id: 130, date: "2023-10-30", category: "Misc", type: "Charity", desc: "Donation", credit: 0, debit: 100.00 }
+    ];
+
+    // 2. Define Column Properties
+    const colProps = {
+        // Text Columns
+        category: { label: "Category", icon: "📂" },
+        type:     { label: "Sub-Category", icon: "🔖" },
+        desc:     { label: "Description", icon: "📝" },
+        date:     { label: "Date", class: "text-center" },
+
+        // Numeric Column: "Credit" (Money In)
+        credit: {
+            label: "In (+)",
+            decimals: 2,
+            class: "money-in",
+            formatter: (v) => v > 0 ? `+${DrillDowner.formatNumber(v, 2)}` : '-'
+        },
+
+        // Numeric Column: "Debit" (Money Out)
+        // Note: The data has positive numbers here, balance logic handles the subtraction
+        debit: {
+            label: "Out (-)",
+            decimals: 2,
+            class: "money-out",
+            formatter: (v) => v > 0 ? `-${DrillDowner.formatNumber(v, 2)}` : '-'
+        },
+
+        // The Calculated Balance Column
+        // It has NO data in the source array. It is purely calculated.
+        balance: {
+            label: "Balance / Net",
+            decimals: 2,
+            class: "balance-cell",
+
+            // --- THE NEW LOGIC ---
+            balanceBehavior: {
+                add: ["credit"],       // Add these columns
+                subtract: ["debit"],   // Subtract these columns
+                initialBalance: 5000   // Start ledger with $5,000
+            },
+
+            // Format negative balances in red
+            formatter: (v) => {
+                const color = v < 0 ? 'red' : 'green';
+                return `<span style="color:${color}">${v < 0 ? '' : '$'}${DrillDowner.formatNumber(v, 2)}</span>`;
+            }
+        }
+    };
+
+    document.addEventListener('DOMContentLoaded', function() {
+        new DrillDowner('#table-container', transactions, {
+            // --- Configuration ---
+
+            // 1. Columns to Calculate
+            totals: ["credit", "debit", "balance"],
+
+            // 2. Default View (Hierarchical)
+            // Shows Net Income per Category (In - Out)
+            groupOrder: ["category", "type"],
+            columns: ["desc", "date"],
+
+            // 3. Ledger Views (Flat)
+            // Shows Running Balance row by row
+            ledger: [
+                {
+                    label: "📄 Bank Statement (Running Balance)",
+                    cols: ["date", "desc", "credit", "debit", "balance"],
+                    sort: ["date"]
+                },
+                {
+                    label: "📊 High Value Transactions (> $100)",
+                    cols: ["category", "desc", "credit", "debit"], // No balance column here, just list
+                    sort: ["debit"]
+                }
+            ],
+
+            colProperties: colProps,
+            controlsSelector: '#table-controls',
+            azBarSelector: '#az-bar',
+
+            // Optional: Pre-defined groupings for the dropdown
+            groupOrderCombinations: [
+                ["category", "type"],
+                ["type", "category"],
+                ["date"] // Group by date
+            ]
+        });
+    });
+</script>
+
+</body>
+</html>

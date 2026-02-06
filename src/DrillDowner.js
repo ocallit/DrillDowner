@@ -1,6 +1,6 @@
 /* jshint esversion:11 */
 class DrillDowner {
-    static version = '1.1.14';
+    static version = '1.1.19';
 
     constructor(container, dataArr, options = {}) {
         this.container = typeof container === 'string' ? document.querySelector(container) : container;
@@ -72,7 +72,6 @@ class DrillDowner {
         const targetValue = newOrder.join(',');
         let found = false;
 
-        // If using groupOrderCombinations, first check if newOrder matches any combination
         if (this.options.groupOrderCombinations) {
             for (let i = 0; i < this.options.groupOrderCombinations.length; i++) {
                 if (this.options.groupOrderCombinations[i].join(',') === targetValue) {
@@ -82,7 +81,6 @@ class DrillDowner {
                 }
             }
         } else {
-            // Search by key-string value
             for (let i = 0; i < select.options.length; i++) {
                 if (select.options[i].value === targetValue) {
                     select.selectedIndex = i;
@@ -92,7 +90,6 @@ class DrillDowner {
             }
         }
 
-        // Add custom order if it doesn't exist
         if (!found) {
             const label = newOrder.map(col => this._getColLabel(col)).join(' → ');
             select.add(new Option(label, targetValue));
@@ -149,7 +146,10 @@ class DrillDowner {
 
         if (this.options.groupOrder.length === 0 && this.activeLedgerIndex >= 0 && this.options.ledger[this.activeLedgerIndex]) {
             const activeLedger = this.options.ledger[this.activeLedgerIndex];
-            if (activeLedger.cols) this.options.columns = activeLedger.cols;
+            if (activeLedger.cols) {
+                // Filter out totals to avoid duplicate undefined text columns
+                this.options.columns = activeLedger.cols.filter(c => !this.options.totals.includes(c));
+            }
         }
 
         if (this.options.groupOrder.length > 0) this.activeLedgerIndex = -1;
@@ -189,13 +189,11 @@ class DrillDowner {
         if (div.querySelector('select')) return;
 
         let optionsHtml = '';
-        // 1. Handle Combinations
         if (this.options.groupOrderCombinations) {
             this.options.groupOrderCombinations.forEach((combo, idx) => {
                 optionsHtml += `<option value="${idx}">${combo.map(k => this._getColLabel(k)).join(' → ')}</option>`;
             });
         }
-        // 2. Handle Permutations
         else if (this.options.groupOrder.length > 0) {
             const perms = this._generatePermutations(this.options.groupOrder.length);
             perms.slice(0, 9).forEach(p => {
@@ -204,7 +202,6 @@ class DrillDowner {
             });
         }
 
-        // 3. Handle Ledgers
         this.options.ledger.forEach((l, i) => {
             optionsHtml += `<option value="__LEDGER_${i}__">${l.label}</option>`;
         });
@@ -221,15 +218,12 @@ class DrillDowner {
                 this.options.groupOrder = [];
             } else {
                 this.activeLedgerIndex = -1;
-                // Recover original columns if returning from Ledger
                 this.options.columns = [...this._defaultColumns];
 
                 if (this.options.groupOrderCombinations) {
-                    // Check if value is an index (digits only) or a key-string
                     if (/^\d+$/.test(val)) {
                         this.options.groupOrder = this.options.groupOrderCombinations[parseInt(val)];
                     } else {
-                        // Custom order added via changeGroupOrder - parse as key-string
                         this.options.groupOrder = val.split(',');
                     }
                 } else {
@@ -311,16 +305,102 @@ class DrillDowner {
         });
 
         const tbody = table.createTBody();
+
+        // --- LEDGER VIEW (FLAT) ---
         if (this.options.groupOrder.length === 0 && this.activeLedgerIndex >= 0) {
             const led = this.options.ledger[this.activeLedgerIndex];
-            this._sortAsc(this.dataArr, led.sort).forEach((item, idx) => {
+
+            // --- PASS 1: Calculate Running Balances in Chronological Order (Ascending) ---
+            const calcKeys = (led.sort || []).map(k => k.startsWith('-') ? k.substring(1) : k);
+            const calcList = [...this.dataArr];
+            this._sortData(calcList, calcKeys);
+
+            const runningTotals = {};
+            // Check if any column has an initial balance to decide if we need the row later
+            let hasInitialBalance = false;
+
+            this.options.totals.forEach(col => {
+                const props = this._getColProperty(col, 'balanceBehavior');
+                const init = (props && typeof props.initialBalance === 'number') ? props.initialBalance : 0;
+                runningTotals[col] = init;
+                if(props && typeof props.initialBalance === 'number') hasInitialBalance = true;
+            });
+
+            const balanceMap = new Map();
+            calcList.forEach(item => {
+                const itemOverrides = {};
+                this.options.totals.forEach(col => {
+                    const props = this._getColProperty(col, 'balanceBehavior');
+                    if (props) {
+                        const impact = this._calculateRowImpact(item, col);
+                        runningTotals[col] += impact;
+                        itemOverrides[col] = runningTotals[col];
+                    }
+                });
+                balanceMap.set(item, itemOverrides);
+            });
+
+            // --- PASS 2: Render in Display Order ---
+            this._sortData(this.dataArr, led.sort);
+
+            // Determine if sort is Descending (starts with '-') to place Initial Balance at Bottom
+            const isDescending = (led.sort && led.sort.length > 0 && led.sort[0].startsWith('-'));
+
+            // --- Helper to Render Initial Balance Row ---
+            const renderInitialRow = () => {
+                const tr = tbody.insertRow();
+                tr.className = 'drillDowner_initial_row'; // Styling hook
+                tr.style.backgroundColor = '#fafafa'; // Light grey to distinguish
+                tr.style.fontStyle = 'italic';
+
+                tr.insertCell().innerHTML = ''; // Indent cell
+
+                // Totals columns (Fill only those with Initial Balance)
+                this.options.totals.forEach(col => {
+                    const td = tr.insertCell();
+                    td.className = 'drillDowner_num';
+                    const props = this._getColProperty(col, 'balanceBehavior');
+                    if (props && typeof props.initialBalance === 'number') {
+                        const dec = this._getColDecimals(col);
+                        const fmt = this._getColFormatter(col);
+                        const val = props.initialBalance;
+                        td.innerHTML = fmt ? fmt(val, {}) : DrillDowner.formatNumber(val, dec);
+                    } else {
+                        td.innerHTML = '';
+                    }
+                });
+
+                // Regular columns (Label "Initial Balance" in first available)
+                let labelSet = false;
+                this.options.columns.forEach(col => {
+                    const td = tr.insertCell();
+                    td.className = this._getColClass(col);
+                    if (!labelSet) {
+                        td.innerHTML = 'Initial Balance';
+                        labelSet = true;
+                    } else {
+                        td.innerHTML = '';
+                    }
+                });
+            };
+
+            // IF ASCENDING: Render Top
+            if (hasInitialBalance && !isDescending) renderInitialRow();
+
+            this.dataArr.forEach((item, idx) => {
                 const tr = tbody.insertRow();
                 if (idx % 2) tr.className = 'drillDowner_even';
                 tr.insertCell().innerHTML = `<span class="drillDowner_indent_0">${idx + 1}</span>`;
-                this._appendDataCells(tr, item, null, true);
+                const rowOverrides = balanceMap.get(item) || {};
+                this._appendDataCells(tr, item, null, true, rowOverrides);
             });
+
+            // IF DESCENDING: Render Bottom (Just above Footer)
+            if (hasInitialBalance && isDescending) renderInitialRow();
+
+            // --- GROUPED VIEW (HIERARCHICAL) ---
         } else {
-            this._sortAsc(this.dataArr, this.options.groupOrder);
+            this._sortData(this.dataArr, this.options.groupOrder);
             this._buildFlatRows(this.dataArr, this.options.groupOrder, 0, {}, [], tbody);
         }
 
@@ -371,33 +451,28 @@ class DrillDowner {
             const icon = (level < groupOrder.length) ? `<span class="drillDowner_drill_icon drillDowner_drill_collapsed" data-rowid="${rowId}" data-level="${level}"></span>` : '';
             cell.innerHTML = `${anchor}<span class="drillDowner_indent_${level}">${icon}${level === 0 ? `<b>${key}</b>` : key}</span>`;
 
-            // Append cells for GROUP row (with totals)
             this._appendDataCells(tr, gData[0], gData, false);
 
-            // Recursively build SUBGROUPS first
             this._buildFlatRows(gData, groupOrder, level + 1, {...parents, [col]: key}, rows, tbody);
 
-            // CRITICAL FIX: Create DETAIL rows after the last grouping level
             if (level === groupOrder.length - 1) {
                 gData.forEach((item, idx) => {
                     const detailRow = tbody.insertRow();
                     detailRow.id = rowId + "_detail_" + idx;
-                    detailRow.setAttribute('data-level', level + 1);  // One deeper than group
-                    detailRow.setAttribute('data-parent', rowId);     // Parent = group row
+                    detailRow.setAttribute('data-level', level + 1);
+                    detailRow.setAttribute('data-parent', rowId);
                     if (idx % 2) detailRow.classList.add('drillDowner_even');
 
-                    // Indent cell for detail row (no icon, just the group value)
                     const indentCell = detailRow.insertCell();
                     indentCell.innerHTML = `<span class="drillDowner_indent_${level + 1}">${item[col]}</span>`;
 
-                    // Append cells for DETAIL row (individual values, not totals)
                     this._appendDataCells(detailRow, item, null, true);
                 });
             }
         });
     }
 
-    _appendDataCells(tr, item, gData, isLeaf) {
+    _appendDataCells(tr, item, gData, isLeaf, overrides = {}) {
         this.options.totals.forEach(col => {
             const td = tr.insertCell();
             td.className = 'drillDowner_num';
@@ -405,19 +480,40 @@ class DrillDowner {
             const fmt = this._getColFormatter(col);
 
             if (gData) {
+                // --- GROUPED VIEW ---
                 const subBy = this._getColProperty(col, 'subTotalBy');
                 if (!subBy) {
-                    const val = gData.reduce((s, r) => s + (Number(r[col]) || 0), 0);
+                    let val;
+                    if (this._getColProperty(col, 'balanceBehavior')) {
+                        val = gData.reduce((s, r) => s + this._calculateRowImpact(r, col), 0);
+                    } else {
+                        val = gData.reduce((s, r) => s + (Number(r[col]) || 0), 0);
+                    }
                     td.innerHTML = fmt ? fmt(val, item) : DrillDowner.formatNumber(val, dec);
                 }
                 else {
                     const sub = {};
-                    gData.forEach(r => { sub[r[subBy]] = (sub[r[subBy]] || 0) + Number(r[col]); });
+                    gData.forEach(r => {
+                        const v = this._getColProperty(col, 'balanceBehavior')
+                            ? this._calculateRowImpact(r, col)
+                            : Number(r[col]);
+                        sub[r[subBy]] = (sub[r[subBy]] || 0) + v;
+                    });
                     const val = Object.entries(sub).map(([s, v]) => `${DrillDowner.formatNumber(v, dec)} ${s}`).join(', ') || '-';
                     td.innerHTML = fmt ? fmt(val, item) : val;
                 }
             } else {
-                const val = item[col];
+                // --- LEDGER VIEW ---
+                let val;
+                if (overrides && overrides.hasOwnProperty(col)) {
+                    val = overrides[col];
+                }
+                else if (this._getColProperty(col, 'balanceBehavior')) {
+                    val = this._calculateRowImpact(item, col);
+                }
+                else {
+                    val = item[col];
+                }
                 td.innerHTML = fmt ? fmt(val, item) : DrillDowner.formatNumber(val, dec);
             }
         });
@@ -432,8 +528,6 @@ class DrillDowner {
         });
     }
 
-    // ---------- Helpers ----------
-
     _getColProperty(c, p, f = null) { return this.options.colProperties[c]?.[p] ?? f; }
     _getColDecimals(c) { return this._getColProperty(c, 'decimals', 2); }
     _getColLabel(c) { return this._getColProperty(c, 'label', c.charAt(0).toUpperCase() + c.slice(1)); }
@@ -447,6 +541,19 @@ class DrillDowner {
             .normalize('NFKD')
             .replace(/[\u0300-\u036f]/g, '')
             .replace(/[^a-zA-Z0-9_-]/g, '_');
+    }
+
+    _calculateRowImpact(row, colKey) {
+        const props = this._getColProperty(colKey, 'balanceBehavior');
+        if (!props) return Number(row[colKey]) || 0;
+        let val = 0;
+        if (Array.isArray(props.add)) {
+            props.add.forEach(c => { val += (Number(row[c]) || 0); });
+        }
+        if (Array.isArray(props.subtract)) {
+            props.subtract.forEach(c => { val -= (Number(row[c]) || 0); });
+        }
+        return val;
     }
 
     _onDrillClick(e) {
@@ -482,28 +589,45 @@ class DrillDowner {
         }
         this.azBar.innerHTML = html;
         this.azBar.querySelectorAll('.drillDowner_az_link').forEach(a => a.onclick = () => this._onAZClick());
+        this._applyAzBarOrientation();
     }
 
     _applyAzBarOrientation() {
         if (!this.azBar) return;
-        this._applyAzBarOrientation();
+        this.azBar.classList.add('drillDowner_az_bar');
+
         const ori = (this.options.azBarOrientation || 'vertical').toLowerCase();
         const isH = (ori === 'horizontal' || ori === 'h' || ori === 'row');
 
-        // Keep base class and only toggle a modifier
-        this.azBar.classList.add('drillDowner_az_bar');
-        this.azBar.classList.toggle('drillDowner_az_bar_horizontal', isH);
+        if (isH) {
+            this.azBar.classList.add('drillDowner_az_bar_horizontal');
+        } else {
+            this.azBar.classList.remove('drillDowner_az_bar_horizontal');
+        }
     }
-
 
     _calculateGrandTotals() {
         const t = {};
         this.options.totals.forEach(c => {
             const sub = this._getColProperty(c, 'subTotalBy');
-            if (!sub) t[c] = this.dataArr.reduce((s, r) => s + (Number(r[c]) || 0), 0);
-            else {
+            if (!sub) {
+                const props = this._getColProperty(c, 'balanceBehavior');
+                if (props) {
+                    const startBal = (typeof props.initialBalance === 'number') ? props.initialBalance : 0;
+                    t[c] = this.dataArr.reduce((s, r) => s + this._calculateRowImpact(r, c), startBal);
+                } else {
+                    t[c] = this.dataArr.reduce((s, r) => s + (Number(r[c]) || 0), 0);
+                }
+            } else {
                 const res = {};
-                this.dataArr.forEach(r => { if (r[c] != null) res[r[sub]] = (res[r[sub]] || 0) + Number(r[c]); });
+                this.dataArr.forEach(r => {
+                    if (r[c] != null || this._getColProperty(c, 'balanceBehavior')) {
+                        const val = this._getColProperty(c, 'balanceBehavior')
+                            ? this._calculateRowImpact(r, c)
+                            : (Number(r[c]) || 0);
+                        res[r[sub]] = (res[r[sub]] || 0) + val;
+                    }
+                });
                 t[c] = res;
             }
         });
@@ -516,12 +640,14 @@ class DrillDowner {
         return Object.entries(val).map(([s, v]) => `${DrillDowner.formatNumber(v, dec)} ${s}`).join('<br>') || '-';
     }
 
-    _sortAsc(arr, keys) {
+    _sortData(arr, keys) {
         if(!keys?.length) return arr;
         return arr.sort((a, b) => {
             for (let k of keys) {
-                const r = this._natSort(String(a[k]||""), String(b[k]||""));
-                if (r !== 0) return r;
+                const desc = k.startsWith('-');
+                const key = desc ? k.substring(1) : k;
+                const r = this._natSort(String(a[key]||""), String(b[key]||""));
+                if (r !== 0) return desc ? -r : r;
             } return 0;
         });
     }

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>DrillDowner - Descending Date Ledger</title>
+  <link href="../src/drilldowner.css" rel="stylesheet" type="text/css"/>
+  <script src="../src/DrillDowner.js"></script>
+  <style>
+    body { font-family: sans-serif; margin: 20px; background: #f4f7f6; }
+    .container { display: flex; gap: 20px; background: white; padding: 20px; }
+    .controls { margin-bottom: 20px; padding: 15px; background: white; border-left: 5px solid #2196F3; }
+    .col-in { color: green; }
+    .col-out { color: red; }
+    .col-bal { font-weight: bold; color: blue; }
+    .note { font-size: 0.9em; color: #666; margin-top: 5px; }
+  </style>
+</head>
+<body>
+
+<h1>Ledger: Latest Date First</h1>
+<div class="controls" id="table-controls"></div>
+<div class="container">
+  <div class="sidebar" id="az-bar"></div>
+  <div id="table-container"></div>
+</div>
+
+<script>
+  const data = [
+    { id: 1,  date: "2023-11-01", type: "Dep", cat: "Job",    desc: "Salary",   in_val: 5000, out_val: 0 },
+    { id: 4,  date: "2023-11-15", type: "Dep", cat: "Job",    desc: "Bonus",    in_val: 1000, out_val: 0 },
+    { id: 11, date: "2023-11-02", type: "Dep", cat: "Job",    desc: "Charge",   in_val: 0,    out_val: 50 },
+    { id: 3,  date: "2023-11-05", type: "Wth", cat: "Living", desc: "Food",     in_val: 0,    out_val: 300 },
+    { id: 3,  date: "2023-11-05", type: "Wth", cat: "Living", desc: "Sublet",   in_val: 400,  out_val: 0 },
+    { id: 5,  date: "2023-11-20", type: "Wth", cat: "Fun",    desc: "Movies",   in_val: 0,    out_val: 50 },
+    { id: 2,  date: "2023-11-03", type: "Wth", cat: "Living", desc: "Rent",     in_val: 0,    out_val: 1200 },
+    { id: 6,  date: "2023-11-21", type: "Wth", cat: "Fun",    desc: "Snacks",   in_val: null, out_val: 20 }
+  ];
+
+  document.addEventListener('DOMContentLoaded', function() {
+    new DrillDowner('#table-container', data, {
+      totals: ["in_val", "out_val", "balance"],
+      groupOrder: ["cat", "type", "desc"],
+      columns: ["date", "desc"],
+
+      // LEDGER MODE CONFIGURATION
+      ledger: [{
+        label: "Statement (Latest First)",
+        // Notice the minus sign (-) for Descending Sort
+        sort: ["-date", "-id"],
+        cols: ["date", "desc", "cat", "type"]
+      }],
+
+      colProperties: {
+        in_val:  { label: "In",  decimals: 2, class: "col-in" },
+        out_val: { label: "Out", decimals: 2, class: "col-out" },
+        date:    { label: "Date" },
+        balance: {
+          label: "Balance",
+          decimals: 2,
+          class: "col-bal",
+          balanceBehavior: {
+            add: ["in_val"],
+            subtract: ["out_val"],
+            initialBalance: 2500
+          }
+        }
+      },
+      controlsSelector: '#table-controls'
+    });
+  });
+</script>
+</body>
+</html>
