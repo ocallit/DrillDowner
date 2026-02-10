@@ -153,17 +153,18 @@ new DrillDowner(container, dataArr, options)
 
 ### Key Options
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `groupOrder` | Array | Column names for hierarchy |
-| `columns` | Array | Display columns |
-| `totals` | Array | Columns to sum |
-| `colProperties` | Object | Column formatting and behavior |
-| `ledger` | Array | Flat view configurations |
-| `groupOrderCombinations` | Array | Predefined grouping combinations |
-| `controlsSelector` | string | Container for navigation controls |
-| `azBarSelector` | string | Container for A-Z navigation |
-| `showGrandTotals` | boolean | Show/hide grand totals (default: true) |
+| Option | Type     | Description                            |
+|--------|----------|----------------------------------------|
+| `groupOrder` | Array    | Column names for hierarchy             |
+| `columns` | Array    | Display columns                        |
+| `totals` | Array    | Columns to sum                         |
+| `colProperties` | Object   | Column formatting and behavior         |
+| `ledger` | Array    | Flat view configurations               |
+| `groupOrderCombinations` | Array    | Predefined grouping combinations       |
+| `controlsSelector` | string   | Container for navigation controls      |
+| `azBarSelector` | string   | Container for A-Z navigation           |
+| `showGrandTotals` | boolean  | Show/hide grand totals (default: true) |
+| `onLabelClick` | function | Click callback                         |
 
 ### Public Methods
 

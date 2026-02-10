@@ -4,7 +4,7 @@
 
 DrillDowner is a dependency-free ES6 JavaScript class that creates interactive, hierarchical data tables with drill-down functionality. It allows users to explore nested data by expanding and collapsing groups, switch to flat "ledger" views, with support for totals, custom formatting, and navigation controls.
 
-**Current Version:** 1.1.13
+**Current Version:** 1.1.20
 
 ## Constructor
 
@@ -143,6 +143,14 @@ Container for A-Z navigation bar (alphabet quick-jump). Only renders when `group
 - **Default:** `null`
 - **Example:** `"#alphabet-nav"`
 
+#### `azBarOrientation` (string)
+
+Defines the layout orientation for the A-Z navigation bar.
+
+- **Type:** string ('vertical' | 'horizontal')
+- **Default:** `'vertical'`
+- **Behavior:** Accepts `'vertical'` for a standard side-bar or `'horizontal'` (also accepts `'h'` or `'row'`) to apply the `drillDowner_az_bar_horizontal` class.
+
 ### Display Options
 
 #### `showGrandTotals` (boolean)
@@ -161,6 +169,26 @@ Prefix for all DOM element IDs to avoid conflicts.
 - **Default:** Auto-generated random string (`'drillDowner' + random + '_'`)
 - **Note:** Usually auto-generated; override only if needed for specific DOM targeting
 
+### Interaction & Events
+
+#### `onLabelClick` (Function)
+
+A callback function triggered when a user clicks on the text label of a group or item row. This is useful for opening context menus, "Cardex" dialogs, or navigating to detailed views based on the hierarchy context.
+
+* **Type**: `Function` | `null`
+* **Default**: `null`
+* **Signature**: `(context) => void`
+
+**The `context` Object:**
+
+| Key | Type | Description |
+| :--- | :--- | :--- |
+| `label` | `string` | The literal text of the clicked label (e.g., "Main WH"). |
+| `level` | `number` | The depth level in the hierarchy (0 = top level). |
+| `column` | `string` | The name of the column from `groupOrder` at this level (e.g., "Warehouse"). |
+| `hierarchyValues` | `Array` | Sequential list of values from the root to the clicked node (e.g. `["Main WH", "Electronics"]`). |
+| `hierarchyMap` | `Object` | Key-value pairs mapping column names to their path values (e.g. `{ Warehouse: "Main WH", Category: "Electronics" }`). |
+| `rowElement` | `DOM` | The native `<tr>` element that was clicked. |
 ---
 
 ## Column Properties (`colProperties`)

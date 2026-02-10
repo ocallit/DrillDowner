@@ -1,6 +1,6 @@
 /* jshint esversion:11 */
 class DrillDowner {
-    static version = '1.1.19';
+    static version = '1.1.20';
 
     constructor(container, dataArr, options = {}) {
         this.container = typeof container === 'string' ? document.querySelector(container) : container;
@@ -18,6 +18,7 @@ class DrillDowner {
             azBarOrientation: 'vertical',
             controlsSelector: null,
             showGrandTotals: true,
+            onLabelClick: null, // labelIno: (eventData) => void
         }, options);
 
         if (this.options.ledger && !Array.isArray(this.options.ledger)) {
@@ -130,6 +131,69 @@ class DrillDowner {
 
     collapseAll() { return this.collapseToLevel(0); }
     expandAll() { return this.collapseToLevel(this.options.groupOrder.length ); }
+
+    // Label click
+    _onTableClick(e) {
+        if (typeof this.options.onLabelClick !== 'function') return;
+
+        const labelSpan = e.target.closest('span[class*="drillDowner_indent_"]');
+        if (!labelSpan) return;
+        if (e.target.classList.contains('drillDowner_drill_icon')) return;
+
+        const row = labelSpan.closest('tr');
+        if (!row) return;
+
+        // 1. Get the depth level (0 = Warehouse, 1 = Category, 2 = Product)
+        const level = parseInt(row.getAttribute('data-level') || "0");
+
+        // 2. Get the specific column name for this level (e.g., "Warehouse")
+        // This is how the code knows "Main WH" belongs to "Warehouse"
+        const clickedColumn = this.options.groupOrder[level];
+
+        // 3. Get the full path of Values (e.g., ["Main WH", "Electronics"])
+        const valuePath = this._getHierarchyForRow(row);
+
+        // 4. Map Values to Columns to create a structured object
+        // Result: { Warehouse: "Main WH", Category: "Electronics" }
+        const pathMap = {};
+        valuePath.forEach((val, index) => {
+            const colName = this.options.groupOrder[index];
+            pathMap[colName] = val;
+        });
+
+        const context = {
+            label: labelSpan.innerText.trim(), // "Main WH"
+            level: level,                      // 0
+            column: clickedColumn,             // "Warehouse" <--- THE KEY LINK
+            hierarchyValues: valuePath,        // ["Main WH"]
+            hierarchyMap: pathMap,             // { Warehouse: "Main WH" }
+            rowElement: row
+        };
+
+        this.options.onLabelClick(context);
+    }
+
+    _getHierarchyForRow(row) {
+        const chain = [];
+        let current = row;
+
+        while (current) {
+            // Extract text from the indented span
+            const span = current.querySelector('span[class*="drillDowner_indent_"]');
+            if (span) {
+                // Clone to remove children (like the drill icon) to get just the text
+                const clone = span.cloneNode(true);
+                clone.querySelectorAll('.drillDowner_drill_icon').forEach(el => el.remove());
+                chain.unshift(clone.innerText.trim());
+            }
+
+            // Move up to parent using internal data attribute
+            const parentId = current.getAttribute('data-parent');
+            if (!parentId || parentId.trim() === "") break;
+            current = document.getElementById(parentId);
+        }
+        return chain;
+    }
 
     destroy() {
         if(this.controls) this.controls.innerHTML = '';
@@ -420,6 +484,7 @@ class DrillDowner {
         this.container.appendChild(table);
         this.table = table;
         table.querySelectorAll('.drillDowner_drill_icon').forEach(i => i.onclick = (e) => this._onDrillClick(e));
+        this.table.addEventListener('click', (e) => this._onTableClick(e));
     }
 
     _buildFlatRows(data, groupOrder, level, parents, rows, tbody) {

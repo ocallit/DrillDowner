@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>DrillDowner onLabelClick Example</title>
+    <link rel="stylesheet" href="../src/drilldowner.css">
+    <script src="../src/DrillDowner.js"></script>
+    <style>
+        /* Audit Highlight Styling */
+        .audit-dialog {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            border-radius: 8px;
+            width: 400px;
+        }
+        .audit-dialog table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        .audit-dialog th, .audit-dialog td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        .audit-dialog th { background-color: #f4f4f4; }
+        .overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; }
+
+        /* Cursor hint for labels */
+        .drillDowner_table span[class*="drillDowner_indent_"] {
+            cursor: pointer;
+        }
+        .drillDowner_table span[class*="drillDowner_indent_"]:hover {
+            text-decoration: underline;
+            color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+
+<h2>DrillDowner onLabelClick Example</h2>
+<div id="controls"></div>
+<div id="table-container"></div>
+
+<div class="overlay" id="overlay"></div>
+<div class="audit-dialog" id="auditDialog">
+    <h3>Context Actions</h3>
+    <div id="contextTableContainer"></div>
+    <div style="margin-top: 15px; text-align: right;">
+        <button onclick="closeDialog()">Close</button>
+    </div>
+</div>
+
+<script>
+    // Sample Stock Data
+    const stockData = [
+        { Warehouse: "Main WH", Category: "Electronics", Product: "iPhone 15", Qty: 50 },
+        { Warehouse: "Main WH", Category: "Electronics", Product: "Samsung S24", Qty: 30 },
+        { Warehouse: "Remote WH", Category: "Furniture", Product: "Office Chair", Qty: 100 }
+    ];
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // Initialize DrillDowner with the onLabelClick pattern
+        const drill = new DrillDowner('#table-container', stockData, {
+            groupOrder: ["Warehouse", "Category", "Product"], // The hierarchy path
+            columns: ["Qty"],
+            controlsSelector: '#controls',
+
+            // Callback triggered by internal DrillDowner logic
+            onLabelClick: (ctx) => {
+                openDialog(ctx);
+            }
+        });
+    });
+
+    /**
+     * Opens the dialog and populates the context table
+     * @param {Object} ctx - The context object provided by DrillDowner
+     */
+    function openDialog(ctx) {
+        const container = document.getElementById('contextTableContainer');
+
+        let html = `<table>
+                <thead>
+                    <tr><th>Key</th><th>Value</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><b>Clicked Level</b></td><td>${ctx.column}</td></tr>
+                    <tr><td><b>Current Label</b></td><td>${ctx.label}</td></tr>`;
+
+        // Display the full hierarchy path
+        ctx.hierarchyValues.forEach((val, idx) => {
+            html += `<tr><td>Path Level ${idx}</td><td>${val}</td></tr>`;
+        });
+
+        html += `</tbody></table>`;
+
+        // Example of dynamic actions based on level
+        html += `<p>Actions for <b>${ctx.label}</b>:</p>
+                     <button>View ${ctx.column} Cardex</button>
+                     <button>Movement History</button>`;
+
+        container.innerHTML = html;
+        document.getElementById('auditDialog').style.display = 'block';
+        document.getElementById('overlay').style.display = 'block';
+    }
+
+    function closeDialog() {
+        document.getElementById('auditDialog').style.display = 'none';
+        document.getElementById('overlay').style.display = 'none';
+    }
+</script>
+</body>
+</html>
