@@ -2,7 +2,7 @@
 
 DrillDowner is a dependency-free ES6 JavaScript class that transforms flat data into interactive hierarchical tables with drill-down navigation, dynamic grouping/flat views, aggregated totals, and customizable formatting—all using native DOM APIs.
 
-**Version:** 1.1.13
+**Version:** 1.1.22
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![AI Documentation](https://img.shields.io/badge/AI%20Docs-Available-brightgreen?logo=robot)](docs/drilldowner_docs.md)

@@ -1,6 +1,6 @@
 /* jshint esversion:11 */
 class DrillDowner {
-    static version = '1.1.20';
+    static version = '1.1.22';
 
     constructor(container, dataArr, options = {}) {
         this.container = typeof container === 'string' ? document.querySelector(container) : container;
