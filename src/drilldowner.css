@@ -32,6 +32,18 @@
 .drillDowner_center {text-align: center}
 
 .drillDowner_drill_expanded:before { content: "▼"; color: darkgreen}
+.drillDowner_child_count {
+    font-size: 0.8em;
+    color: #64748b;
+    background-color: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 1px 6px;
+    margin-right: 6px;
+    display: inline-block;
+    vertical-align: middle;
+    font-weight: normal;
+}
 .drillDowner_indent_0 { padding-left: 0; }
 .drillDowner_indent_1 { padding-left: 2em; }
 .drillDowner_indent_2 { padding-left: 3em; }

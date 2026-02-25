@@ -1,6 +1,6 @@
 /* jshint esversion:11 */
 class DrillDowner {
-    static version = '1.1.22';
+    static version = '1.1.23';
 
     constructor(container, dataArr, options = {}) {
         this.container = typeof container === 'string' ? document.querySelector(container) : container;
@@ -187,7 +187,7 @@ class DrillDowner {
                 chain.unshift(clone.innerText.trim());
             }
 
-            // Move up to parent using internal data attribute
+            // Move up to parent using the internal data attribute
             const parentId = current.getAttribute('data-parent');
             if (!parentId || parentId.trim() === "") break;
             current = document.getElementById(parentId);
@@ -385,8 +385,7 @@ class DrillDowner {
 
             this.options.totals.forEach(col => {
                 const props = this._getColProperty(col, 'balanceBehavior');
-                const init = (props && typeof props.initialBalance === 'number') ? props.initialBalance : 0;
-                runningTotals[col] = init;
+                runningTotals[col] = (props && typeof props.initialBalance === 'number') ? props.initialBalance : 0;
                 if(props && typeof props.initialBalance === 'number') hasInitialBalance = true;
             });
 
@@ -414,7 +413,7 @@ class DrillDowner {
             const renderInitialRow = () => {
                 const tr = tbody.insertRow();
                 tr.className = 'drillDowner_initial_row'; // Styling hook
-                tr.style.backgroundColor = '#fafafa'; // Light grey to distinguish
+                tr.style.backgroundColor = '#fafafa'; // Light gray to distinguish
                 tr.style.fontStyle = 'italic';
 
                 tr.insertCell().innerHTML = ''; // Indent cell
@@ -513,7 +512,7 @@ class DrillDowner {
             }
 
             const cell = tr.insertCell();
-            const icon = (level < groupOrder.length) ? `<span class="drillDowner_drill_icon drillDowner_drill_collapsed" data-rowid="${rowId}" data-level="${level}"></span>` : '';
+            const icon = (level < groupOrder.length) ? `<span class="drillDowner_drill_icon drillDowner_drill_collapsed" data-rowid="${rowId}" data-level="${level}"></span><span class="drillDowner_child_count">${gData.length}</span> ` : '';
             cell.innerHTML = `${anchor}<span class="drillDowner_indent_${level}">${icon}${level === 0 ? `<b>${key}</b>` : key}</span>`;
 
             this._appendDataCells(tr, gData[0], gData, false);
@@ -719,8 +718,61 @@ class DrillDowner {
 
     static formatNumber(n, d) {
         if (n == null || isNaN(n) || n === '') return n || '';
-        return Number(n).toLocaleString('en-US', {minimumFractionDigits: d, maximumFractionDigits: d});
+        let parts = Number(n).toFixed(d).split('.');
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        return parts.join('.');
     }
+
+    // Define array once on the class to avoid memory allocation on every render
+    static _SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    static formatDate(value, includeTime = false) {
+        if (!value) return "";
+
+        let y, m, d, h = 0, min = 0;
+        let hasTime = false;
+
+        if (value instanceof Date) {
+            if (isNaN(value.getTime())) return "";
+            y = value.getFullYear();
+            m = value.getMonth();
+            d = value.getDate();
+            if (includeTime) {
+                h = value.getHours();
+                min = value.getMinutes();
+                hasTime = true;
+            }
+        }
+        else if (typeof value === 'string') {
+            const match = value.match(/^(\d{4})[-/]?(\d{2})[-/]?(\d{2})(?:[T\s](\d{2}):(\d{2}))?/);
+            if (!match) return value; // Return raw string if regex fails
+
+            y = parseInt(match[1], 10);
+            m = parseInt(match[2], 10) - 1; // 0-indexed
+            d = parseInt(match[3], 10);
+
+            if (includeTime && match[4] && match[5]) {
+                h = parseInt(match[4], 10);
+                min = parseInt(match[5], 10);
+                hasTime = true;
+            }
+        }
+        else {
+            return String(value);
+        }
+
+        // Fallback to '??' if month index is invalid (e.g., "0000-00-00")
+        const MMM = DrillDowner._SHORT_MONTHS[m] || '??';
+
+        // Fully inlined template literal for minimal footprint
+        let result = `${String(d).padStart(2, '0')}/${MMM}/${String(y).slice(-2)}`;
+
+        if (includeTime && hasTime) {
+            result += ` ${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+        }
+
+        return result;
+    }
+
 
     _removeAllEventListeners(el) {
         if (!el) return el;

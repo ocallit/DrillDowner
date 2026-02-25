@@ -138,16 +138,17 @@ Calculates a running balance or financial impact based on other columns in the r
 **Example:**
 ```javascript
 {
-  "current_balance": {
+  current_balance: {
     label: "Running Balance",
-            decimals: 2,
-            balanceBehavior: {
+    decimals: 2,
+    balanceBehavior: {
       initialBalance: 5000.00,
-              add: ["deposit_amount", "interest"],
-              subtract: ["withdrawal_amount", "fee"]
+      add: ["deposit_amount", "interest"],
+      subtract: ["withdrawal_amount", "fee"]
     }
   }
 }
+```
 
 ### UI Components
 
@@ -282,17 +283,17 @@ Custom function to format cell values.
 
 ```javascript
 {
-    "status": {
+    status: {
         formatter: function(value, row) {
             const statusMap = {
-                "pending": "⏳ Pending",
-                "active": "🔄 Active",
-                "completed": "✅ Completed"
+                pending: "⏳ Pending",
+                active: "🔄 Active",
+                completed: "✅ Completed"
             };
             return statusMap[value] || value;
         }
     },
-    "priority": {
+    priority: {
         formatter: function(value, row) {
             return "★".repeat(value);
         }
@@ -405,7 +406,7 @@ drillDowner.destroy();
 
 ### `DrillDowner.formatNumber(number, decimals)`
 
-Formats numbers with locale-specific thousands separators (uses `en-US` locale).
+Formats numbers with thousands separators (uses `en-US` locale).
 
 - **Parameters:**
   - `number` (number) - Number to format
@@ -417,6 +418,23 @@ Formats numbers with locale-specific thousands separators (uses `en-US` locale).
 ```javascript
 DrillDowner.formatNumber(1234.567, 2)  // → "1,234.57"
 DrillDowner.formatNumber(1000000, 0)   // → "1,000,000"
+options:{colProperties:{column_name:{formatter:  DrillDowner.formatNumber}}}
+```
+### `DrillDowner.formatDate(value, includeTime)`
+
+- **Parameters:**
+  - `value` (string | Date) - The date string or JavaScript Date object to format.
+  - `includeTime` (boolean, optional) - If true, appends the time in 24-hour format (HH:mm). Default is false.
+- **Returns:** Formatted string (or original value if it cannot be parsed)
+
+
+**Example:**
+
+```javascript
+options:{colProperties:{column_name:{
+    formatter: (val) => DrillDowner.formatDate(val, true) // For DateTime
+    formatter: DrillDowner.formatDate // For Date only 03/Jan/25
+}}}
 ```
 
 ---
