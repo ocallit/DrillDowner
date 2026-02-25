@@ -125,6 +125,30 @@ Predefined grouping combinations for the dropdown selector. When provided, only 
 - **Default:** `null`
 - **Example:** `[["product", "color"], ["color", "product"], ["warehouse", "product"]]`
 
+#### `balanceBehavior` (Object)
+
+Calculates a running balance or financial impact based on other columns in the row. This is particularly useful in Ledger mode (flat views) to show chronological running totals with an optional initial balance.
+
+- **Default:** `undefined`
+- **Structure:**
+  - `initialBalance` (number, optional): The starting value before any rows are calculated. If provided, DrillDowner will automatically render an "Initial Balance" row at the top (or bottom, if sorting descending).
+  - `add` (Array of strings, optional): Column names whose values should be added to the balance.
+  - `subtract` (Array of strings, optional): Column names whose values should be subtracted from the balance.
+
+**Example:**
+```javascript
+{
+  "current_balance": {
+    label: "Running Balance",
+            decimals: 2,
+            balanceBehavior: {
+      initialBalance: 5000.00,
+              add: ["deposit_amount", "interest"],
+              subtract: ["withdrawal_amount", "fee"]
+    }
+  }
+}
+
 ### UI Components
 
 #### `controlsSelector` (string|null)
@@ -657,6 +681,7 @@ The widget generates these CSS classes for styling:
 |-------|-------------|
 | `.drillDowner_right` | Right-aligned text |
 | `.drillDowner_center` | Center-aligned text |
+
 
 ---
 
