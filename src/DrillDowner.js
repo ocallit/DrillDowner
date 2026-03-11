@@ -1,6 +1,6 @@
 /* jshint esversion:11 */
 class DrillDowner {
-    static version = '1.1.23';
+    static version = '1.1.25';
 
     constructor(container, dataArr, options = {}) {
         this.container = typeof container === 'string' ? document.querySelector(container) : container;
@@ -142,6 +142,11 @@ class DrillDowner {
 
     // Label click
     _onTableClick(e) {
+        if(e.target.classList.contains('drillDowner_drill_icon')) {
+            this._onDrillClick(e);
+            return;
+        }
+
         if(typeof this.options.onLabelClick !== 'function') return;
 
         const labelSpan = e.target.closest('span[class*="drillDowner_indent_"]');
@@ -182,9 +187,9 @@ class DrillDowner {
         const chain = [];
         let current = row;
 
-        while (current) {
+        while(current) {
             const span = current.querySelector('span[class*="drillDowner_indent_"]');
-            if (span) {
+            if(span) {
                 const clone = span.cloneNode(true);
                 // Remove the icon AND the child count badge to get the clean raw text
                 clone.querySelectorAll('.drillDowner_drill_icon, .drillDowner_child_count').forEach(el => el.remove());
@@ -192,7 +197,7 @@ class DrillDowner {
             }
 
             const parentId = current.getAttribute('data-parent');
-            if (!parentId || parentId.trim() === "") break;
+            if(!parentId || parentId.trim() === "") break;
             current = document.getElementById(parentId);
         }
         return chain;
@@ -200,11 +205,11 @@ class DrillDowner {
 
     destroy() {
         if(this.controls) this.controls.innerHTML = '';
-        if(this.azBar) {
-            this.azBar = this._removeAllEventListeners(this.azBar);
-            this.azBar.innerHTML = '';
+        if(this.azBar) this.azBar.innerHTML = '';
+
+        if(this.table) {
+            this.table.removeEventListener('click', this._boundOnTableClick);
         }
-        if(this.table) this.table = this._removeAllEventListeners(this.table);
         this.container.innerHTML = '';
     }
 
@@ -220,9 +225,6 @@ class DrillDowner {
         }
 
         if(this.options.groupOrder.length > 0) this.activeLedgerIndex = -1;
-
-        if(this.azBar) this.azBar = this._removeAllEventListeners(this.azBar);
-        if(this.table) this.table = this._removeAllEventListeners(this.table);
 
         this._renderControls();
         this._renderAZBar();
@@ -273,8 +275,9 @@ class DrillDowner {
         });
 
         div.innerHTML = `<div class="drillDowner_control_group">
-            <span class="drillDowner_control_label">Group by:</span>
+            <label class="drillDowner_control_label">Group by:
             <select class="drillDowner_modern_select">${optionsHtml}</select>
+            </label>
         </div>`;
 
         div.querySelector('select').addEventListener('change', (e) => {
@@ -485,18 +488,251 @@ class DrillDowner {
             });
         }
         this.container.appendChild(table);
+
         if(this.table)
             this.table.removeEventListener('click', this._boundOnTableClick);
         this.table = table;
         this.table.addEventListener('click', this._boundOnTableClick);
 
-        table.querySelectorAll('.drillDowner_drill_icon').forEach(i => i.onclick = (e) => this._onDrillClick(e));
-
-
     }
 
     _idCounter = 1;
+
     _buildFlatRows(data, groupOrder, level, parents, rows, tbody) {
+        if(level >= groupOrder.length) return;
+
+        const col = groupOrder[level];
+        const grouped = {};
+
+        data.forEach((r) => {
+            const key = r[col];
+            (grouped[key] = grouped[key] || []).push(r);
+        });
+
+        Object.keys(grouped).forEach((key, i) => {
+            const gData = grouped[key];
+
+            const keys = groupOrder
+                .slice(0, level + 1)
+                .map((c, idx) => idx === level ? key : parents[c]);
+
+            const rowId = this.options.idPrefix + "row_" + (this._idCounter++);
+
+            // rows is now the path -> actual rowId map
+            const pathKey = JSON.stringify(keys);
+            const parentPathKey = JSON.stringify(keys.slice(0, -1));
+            const parentRowId = (level === 0)
+                ? " "
+                : (rows[parentPathKey] || " ");
+
+            rows[pathKey] = rowId;
+
+            let anchorHtml = " ";
+            if(level === 0) {
+                const char = String(key)[0]?.toUpperCase();
+                if(char) {
+                    anchorHtml = `<span id="${this.options.idPrefix}az${this._sanitizeIdPart(char)}"></span>`;
+                }
+            }
+
+            this._buildRow({
+                tbody: tbody,
+                rowId: rowId,
+                level: level,
+                hierarchy: keys,
+                parentRowId: parentRowId,
+
+                groupKey: key,
+                item: gData[0],
+                gData: gData,
+
+                anchorHtml: anchorHtml,
+
+                addEvenClass: !!(i % 2),
+                addFirstGroupClass: (i === 0)
+            });
+
+            this._buildFlatRows(
+                gData,
+                groupOrder,
+                level + 1,
+                {...parents, [col]: key},
+                rows,
+                tbody
+            );
+
+            if(level === groupOrder.length - 1) {
+                gData.forEach((item, idx) => {
+                    const detailRowId = rowId + "_detail_" + idx;
+
+                    const leafLabelColumn = this.options.leafLabelColumn || "";
+                    const currentPath = leafLabelColumn
+                        ? [...keys, item?.[leafLabelColumn] ?? ""]
+                        : [...keys];
+
+                    this._buildRow({
+                        tbody: tbody,
+                        rowId: detailRowId,
+                        level: level + 1,
+                        hierarchy: currentPath,
+                        parentRowId: rowId,
+
+                        item: item,
+                        gData: null,
+
+                        anchorHtml: " ",
+
+                        addEvenClass: !!(idx % 2),
+                        addFirstGroupClass: false
+                    });
+                });
+            }
+        });
+    }
+
+    _buildRow({
+                  tbody,
+                  insertAfterRow = null,
+
+                  rowId,
+                  level,
+                  hierarchy = [],
+                  parentRowId = " ",
+
+                  groupKey = null,
+                  item = null,
+                  gData = null,
+
+                  anchorHtml = " ",
+                  leafLabelColumn = null,
+                  rowOverrides = {},
+
+                  addEvenClass = false,
+                  addFirstGroupClass = false
+              }) {
+        const rowSpec = this._getRowSpec({
+            level: level,
+            groupKey: groupKey,
+            item: item,
+            gData: gData,
+            hierarchy: hierarchy,
+            parentRowId: parentRowId,
+            anchorHtml: anchorHtml,
+            leafLabelColumn: leafLabelColumn
+        });
+
+        const tr = insertAfterRow
+            ? tbody.insertRow(insertAfterRow.sectionRowIndex + 1)
+            : tbody.insertRow();
+
+        tr.id = rowId;
+        tr.setAttribute('data-level', rowSpec.level);
+        tr.setAttribute('data-dimension', rowSpec.dimension);
+        tr.setAttribute('data-parent', rowSpec.parentRowId);
+        tr.setAttribute('data-hierarchy', JSON.stringify(rowSpec.hierarchy));
+
+        if(addEvenClass) tr.classList.add('drillDowner_even');
+        if(addFirstGroupClass) tr.classList.add('drillDowner_first_group');
+
+        const cell = tr.insertCell();
+
+        let iconHtml = '';
+        if(rowSpec.showDrillIcon) {
+            iconHtml =
+                `<span class="drillDowner_drill_icon drillDowner_drill_collapsed" data-rowid="${rowId}" data-level="${rowSpec.level}"></span>`;
+
+            if(rowSpec.childCount !== null) {
+                iconHtml += `<span class="drillDowner_child_count">${rowSpec.childCount}</span> `;
+            }
+        }
+
+        cell.innerHTML =
+            `${rowSpec.anchorHtml}<span class="drillDowner_indent_${rowSpec.level}">${iconHtml}${rowSpec.labelHtml}</span>`;
+
+        this._appendDataCells(
+            tr,
+            item,
+            gData,
+            rowSpec.isLeaf,
+            rowOverrides
+        );
+
+        return tr;
+    }
+
+    _getRowSpec({
+                    level,
+                    groupKey = null,
+                    item = null,
+                    gData = null,
+                    hierarchy = [],
+                    parentRowId = " ",
+                    anchorHtml = " ",
+                    leafLabelColumn = null
+                }) {
+        const groupOrder = this.options.groupOrder || [];
+
+        // --- Invariants / single source of truth ---
+        const isLeaf = level >= groupOrder.length;
+        const showDrillIcon = !isLeaf;
+        const showTotals = !isLeaf;
+
+        // A dimension is ONLY a column in groupOrder.
+        const dimension = isLeaf ? "" : (groupOrder[level] ?? "");
+
+        // leafLabelColumn can come from arg or from options.
+        const resolvedLeafLabelColumn =
+            leafLabelColumn ?? this.options.leafLabelColumn ?? "";
+
+        let label = "";
+        let labelHtml = "";
+
+        if(isLeaf) {
+            // Leaf/detail row:
+            // - never guess
+            // - if no leafLabelColumn, leave blank
+            if(resolvedLeafLabelColumn) {
+                label = item?.[resolvedLeafLabelColumn] ?? "";
+                labelHtml = String(label);
+            } else {
+                label = "";
+                labelHtml = "";
+            }
+        } else {
+            // Group/dimension row:
+            // show the grouped key for the current dimension
+            label = groupKey ?? "";
+            labelHtml = (level === 0)
+                ? `<b>${String(label)}</b>`
+                : String(label);
+        }
+
+        // Totals belong to the row with the icon (group row)
+        const childCount = showDrillIcon && Array.isArray(gData)
+            ? gData.length
+            : null;
+
+        return {
+            level: level,
+            isLeaf: isLeaf,
+            showDrillIcon: showDrillIcon,
+            showTotals: showTotals,
+
+            dimension: dimension,
+            label: label,
+            labelHtml: labelHtml,
+
+            childCount: childCount,
+
+            hierarchy: hierarchy,
+            parentRowId: parentRowId,
+            anchorHtml: anchorHtml,
+
+            leafLabelColumn: resolvedLeafLabelColumn
+        };
+    }
+
+    _buildFlatRowsOld(data, groupOrder, level, parents, rows, tbody) {
         if(level >= groupOrder.length) return;
         const col = groupOrder[level];
         const grouped = {};
@@ -508,6 +744,7 @@ class DrillDowner {
             const gData = grouped[key];
             const keys = groupOrder.slice(0, level + 1).map((c, idx) => idx === level ? key : parents[c]);
             const sanitizedKeys = keys.map((value) => this._sanitizeIdPart(value));
+            //const rowId =  this.options.idPrefix + "row_" + (this._idCounter++); // sanitizedKeys.join("_");
             const rowId = this.options.idPrefix + "row_" + sanitizedKeys.join("_");
 
             const tr = tbody.insertRow();
@@ -516,6 +753,7 @@ class DrillDowner {
             tr.setAttribute('data-dimension', col);
             tr.setAttribute('data-display-names', JSON.stringify(keys));
             tr.setAttribute('data-parent', level === 0 ? " " : this.options.idPrefix + "row_" + groupOrder.slice(0, level).map(c => this._sanitizeIdPart(parents[c])).join("_"));
+
             if(i % 2) tr.classList.add('drillDowner_even');
             if(i === 0) tr.classList.add('drillDowner_first_group');
 
@@ -536,13 +774,13 @@ class DrillDowner {
             if(level === groupOrder.length - 1) {
                 gData.forEach((item, idx) => {
                     const detailRow = tbody.insertRow();
-                    detailRow.id =  rowId + "_detail_" + idx;
+                    detailRow.id = rowId + "_detail_" + idx;
                     detailRow.setAttribute('data-level', level + 1);
                     detailRow.setAttribute('data-parent', rowId);
                     detailRow.setAttribute('data-dimension', col);
-                    console.log("_____Detail row created for dimension:", col, item[col]);
                     const currentPath = [...keys, item[col]];
                     detailRow.setAttribute('data-display-names', JSON.stringify(currentPath));
+                    detailRow.setAttribute('data-hierarchy', JSON.stringify(currentPath));
 
                     if(idx % 2) detailRow.classList.add('drillDowner_even');
 
@@ -602,27 +840,43 @@ class DrillDowner {
             td.className = this._getColClass(col);
             let val = "";
             if(gData && this._getColTogglesUp(col)) val = Array.from(new Set(gData.map(r => r[col]))).join(', ');
-            else if(!gData || isLeaf) val = item[col];
+            else if(!gData || isLeaf) val = item[col] ?? "";
             const fmt = this._getColFormatter(col);
             td.innerHTML = fmt ? fmt(val, item) : val;
         });
     }
 
-    _getColProperty(c, p, defautValue = null) {return this.options.colProperties[c]?.[p] ?? defautValue;}
+    _getColProperty(c, p, defautValue = null) {
+        return this.options.colProperties[c]?.[p] ?? defautValue;
+    }
 
-    _getColDecimals(c) {return this._getColProperty(c, 'decimals', 2);}
+    _getColDecimals(c) {
+        return this._getColProperty(c, 'decimals', 2);
+    }
 
-    _getColLabel(c) {return this._getColProperty(c, 'label', c.charAt(0).toUpperCase() + c.slice(1));}
+    _getColLabel(c) {
+        return this._getColProperty(c, 'label', c.charAt(0).toUpperCase() + c.slice(1));
+    }
 
-    _getGroupIcon(c) {return this._getColProperty(c, 'icon', '');}
+    _getGroupIcon(c) {
+        return this._getColProperty(c, 'icon', '');
+    }
 
-    _getColClass(c) {return this._getColProperty(c, 'class', '');}
+    _getColClass(c) {
+        return this._getColProperty(c, 'class', '');
+    }
 
-    _getColLabelClass(c) {return this._getColProperty(c, 'labelClass', '');}
+    _getColLabelClass(c) {
+        return this._getColProperty(c, 'labelClass', '');
+    }
 
-    _getColTogglesUp(c) {return this._getColProperty(c, 'togglesUp', false);}
+    _getColTogglesUp(c) {
+        return this._getColProperty(c, 'togglesUp', false);
+    }
 
-    _getColFormatter(c) {return this._getColProperty(c, 'formatter', null);}
+    _getColFormatter(c) {
+        return this._getColProperty(c, 'formatter', null);
+    }
 
     _sanitizeIdPart(value) {
         return String(value ?? '')
@@ -671,7 +925,9 @@ class DrillDowner {
         setVisible(rowId, !expanded);
     }
 
-    _onAZClick() {setTimeout(() => window.scrollBy(0, -30), 1);}
+    _onAZClick() {
+        setTimeout(() => window.scrollBy(0, -30), 1);
+    }
 
     _renderAZBar() {
         if(!this.azBar || this.options.groupOrder.length === 0) {
@@ -806,14 +1062,6 @@ class DrillDowner {
         return result;
     }
 
-
-    _removeAllEventListeners(el) {
-        if(!el) return el;
-        const clone = el.cloneNode(true);
-        el.parentNode.replaceChild(clone, el);
-        return clone;
-    }
-
     _generatePermutations(n, limit = 9) {
         const res = [];
         const p = (a, s = 0) => {
@@ -839,10 +1087,10 @@ class DrillDowner {
     _findRowByHierarchy(displayNames) {
         const targetPath = JSON.stringify(displayNames);
         return Array.from(this.table.querySelectorAll('tr')).find(tr =>
-            tr.getAttribute('data-display-names') === targetPath
+            tr.getAttribute('data-hierarchy') === targetPath
         );
     }
-    
+
     /* region: mode remote/fetch ___________________________________________________________________________________ */
 
     _getRequestPayload(action, target = null) {
@@ -860,7 +1108,7 @@ class DrillDowner {
             }
         };
 
-        if (action === 'expand' && target) {
+        if(action === 'expand' && target) {
             const row = target.closest('tr');
             const level = parseInt(row.getAttribute('data-level') || 0);
             payload.requestDetails = {
@@ -870,13 +1118,13 @@ class DrillDowner {
                 displayNames: this._getHierarchyForRow(row),
                 rowId: row.id
             };
-        } else if (action === 'expandToLevel') {
+        } else if(action === 'expandToLevel') {
             // Safe check for target and its dataset
             let targetLevel = 0;
-            if (target) {
-                if (target.dataset.level !== undefined) {
+            if(target) {
+                if(target.dataset.level !== undefined) {
                     targetLevel = parseInt(target.dataset.level);
-                } else if (target.dataset.arrowLevel !== undefined) {
+                } else if(target.dataset.arrowLevel !== undefined) {
                     const isExpanded = target.classList.contains('drillDowner_expanded');
                     const arrowLvl = parseInt(target.dataset.arrowLevel);
                     targetLevel = isExpanded ? arrowLvl : arrowLvl + 1;
@@ -896,27 +1144,26 @@ class DrillDowner {
      */
     _fill(json) {
         // 1. Handle Business/Logic Errors (Status 200 but success: false)
-        if (!json.success) {
+        if(!json.success) {
             alert(json.error_message || "A server error occurred.");
             return;
         }
 
-        const { data } = json;
-        const { action, rows, level, displayNames, grandTotals } = data;
+        const {data} = json;
+        const {action, rows, level, displayNames, grandTotals} = data;
 
         // 2. Update Grand Totals if provided (usually for expandToLevel/change_grouping)
-        if (grandTotals) {
+        if(grandTotals) {
             this.grandTotals = grandTotals;
         }
 
-        if (action === 'expand') {
+        if(action === 'expand') {
             // Find the specific parent row to inject children under
             const parentRow = this._findRowByHierarchy(displayNames);
-            if (!parentRow) return;
+            if(!parentRow) return;
 
             this._injectChildRows(parentRow, rows, level);
-        }
-        else if (action === 'expandToLevel' || action === 'change_grouping') {
+        } else if(action === 'expandToLevel' || action === 'change_grouping') {
             // Complete table refresh for the new level/dimension
             this.dataArr = rows; // Update local reference with the level's data
             this.render();
@@ -932,39 +1179,53 @@ class DrillDowner {
     _injectChildRows(parentRow, rows, parentLevel) {
         const tbody = this.table.tBodies[0];
         let lastInsertedRow = parentRow;
-        const parentHierarchy = JSON.parse(parentRow.getAttribute('data-display-names') || "[]");
+
+        const parentHierarchy = JSON.parse(
+            parentRow.getAttribute('data-hierarchy') || "[]"
+        );
 
         rows.forEach((rowData, idx) => {
-            const tr = tbody.insertRow(lastInsertedRow.sectionRowIndex + 1);
             const currentLevel = parentLevel + 1;
-
-            // Use existing logic to determine dimension
             const isLeaf = currentLevel >= this.options.groupOrder.length;
-            const dimensionKey = isLeaf ? this.options.groupOrder[parentLevel] : this.options.groupOrder[currentLevel];
+
+            const dimensionKey = isLeaf
+                ? this.options.groupOrder[parentLevel]
+                : this.options.groupOrder[currentLevel];
+
             const label = rowData[dimensionKey];
-
-            tr.id = this.options.idPrefix + "row_fetch_" + Math.random().toString(36).slice(2);
-            tr.setAttribute('data-level', currentLevel);
-            tr.setAttribute('data-parent', parentRow.id);
-            tr.setAttribute('data-dimension', dimensionKey); // Critical fix
+            const rowId = this.options.idPrefix + "row_fetch_" + (this._idCounter++);
             const currentHierarchy = [...parentHierarchy, label];
-            tr.setAttribute('data-display-names', JSON.stringify(currentHierarchy));
 
-            if (idx % 2) tr.classList.add('drillDowner_even');
+            const tr = this._buildRow({
+                tbody: tbody,
+                insertAfterRow: lastInsertedRow,
 
-            const cell = tr.insertCell();
-            const icon = !isLeaf ?
-                `<span class="drillDowner_drill_icon drillDowner_drill_collapsed" data-rowid="${tr.id}" data-level="${currentLevel}"></span>` : '';
+                rowId: rowId,
+                level: currentLevel,
+                dimension: dimensionKey,
+                hierarchy: currentHierarchy,
+                parentRowId: parentRow.id,
 
-            cell.innerHTML = `<span class="drillDowner_indent_${currentLevel}">${icon}${label}</span>`;
-            this._appendDataCells(tr, rowData, null, isLeaf);
+                label: label,
+                labelHtml: String(label),
+                anchorHtml: " ",
+
+                showDrillIcon: !isLeaf,
+                childCount: null,
+                isLeaf: isLeaf,
+
+                item: rowData,
+                gData: null,
+
+                addEvenClass: !!(idx % 2),
+                addFirstGroupClass: false
+            });
 
             lastInsertedRow = tr;
         });
 
-        // Toggle parent icon to expanded state
         const icon = parentRow.querySelector('.drillDowner_drill_icon');
-        if (icon) {
+        if(icon) {
             icon.classList.remove('drillDowner_drill_collapsed');
             icon.classList.add('drillDowner_drill_expanded');
         }

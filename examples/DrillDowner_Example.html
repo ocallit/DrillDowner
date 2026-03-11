@@ -64,21 +64,22 @@
 
     <script>
         const sampleData = [
-            { category: "Electronics", product: "Smartphone", brand: "Apple", quantity: 15, price: 999.99, info:"info esa" },
-            { category: "Electronics", product: "Smartphone", brand: "Samsung", quantity: 20, price: 899.99, info:"info ess" },
-            { category: "Electronics", product: "Laptop", brand: "Dell", quantity: 8, price: 1299.99, info:"info eld" },
-            { category: "Electronics", product: "Laptop", brand: "HP", quantity: 12, price: 1199.99, info:"info eshp" },
-            { category: "Electronics", product: "Tablet", brand: "Apple", quantity: 10, price: 599.99, info:"info ETA" },
-            { category: "Electronics", product: "Tablet", brand: "Samsung", quantity: 15, price: 499.99 },
-            { category: "Books", product: "Fiction", brand: "Penguin", quantity: 30, price: 15.99 },
-            { category: "Books", product: "Fiction", brand: "HarperCollins", quantity: 25, price: 14.99 },
-            { category: "Books", product: "Non-Fiction", brand: "Penguin", quantity: 20, price: 19.99 },
-            { category: "Books", product: "Non-Fiction", brand: "HarperCollins", quantity: 15, price: 18.99 },
-            { category: "Clothing", product: "Shirts", brand: "Nike", quantity: 40, price: 29.99 },
-            { category: "Clothing", product: "Shirts", brand: "Adidas", quantity: 35, price: 27.99 },
-            { category: "Clothing", product: "Pants", brand: "Nike", quantity: 30, price: 39.99 },
-            { category: "Clothing", product: "Pants", brand: "Nike", quantity: 31, price: 49.99 },
-            { category: "Clothing", product: "Pants", brand: "Adidas", quantity: 25, price: 37.99 }
+            { category: "Electronics", product: "Smartphone", item:"i15", brand: "Apple", quantity: 15, price: 999.99, info:"info esa" },
+            { category: "Electronics", product: "Smartphone", item:"i14", brand: "Apple", quantity: 25, price: 899.99, info:"info esa" },
+            { category: "Electronics", product: "Smartphone", item:"A25", brand: "Samsung", quantity: 20, price: 899.99, info:"info ess" },
+            { category: "Electronics", product: "Laptop", item:"inspiron", brand: "Dell", quantity: 8, price: 1299.99, info:"info eld" },
+            { category: "Electronics", product: "Laptop", item:"hp43",  brand: "HP", quantity: 12, price: 1199.99, info:"info eshp" },
+            { category: "Electronics", product: "Tablet", item:"iPad2",  brand: "Apple", quantity: 10, price: 599.99, info:"info ETA" },
+            { category: "Electronics", product: "Tablet", item:"iPadS",  brand: "Samsung", quantity: 15, price: 499.99 },
+            { category: "Books", product: "Fiction", item:"Fict1",  brand: "Penguin", quantity: 30, price: 15.99 },
+            { category: "Books", product: "Fiction", item:"Fict2",  brand: "HarperCollins", quantity: 25, price: 14.99 },
+            { category: "Books", product: "Non-Fiction", item:"Bio1",  brand: "Penguin", quantity: 20, price: 19.99 },
+            { category: "Books", product: "Non-Fiction", item:"Bio2",  brand: "HarperCollins", quantity: 15, price: 18.99 },
+            { category: "Clothing", product: "Shirts", item:"Rayada",  brand: "Nike", quantity: 40, price: 29.99 },
+            { category: "Clothing", product: "Shirts", item:"Liza",  brand: "Adidas", quantity: 35, price: 27.99 },
+            { category: "Clothing", product: "Pants", item:"Corto",  brand: "Nike", quantity: 30, price: 39.99 },
+            { category: "Clothing", product: "Pants", item:"Largo",  brand: "Nike", quantity: 31, price: 49.99 },
+            { category: "Clothing", product: "Pants", item:"Largo",  brand: "Adidas", quantity: 25, price: 37.99 }
         ];
 
         // Column properties
@@ -118,8 +119,9 @@
         // Initialize DrillDowner
         document.addEventListener('DOMContentLoaded', function() {
             const drillDowner = new DrillDowner('#table-container', sampleData, {
-                groupOrder: ["category", "brand"],
-                columns: ["info"],
+                groupOrder: ["category", "brand","product",],
+                columns: ["item","info"],
+                // HELP how do we specify item goes in the "Dimesion" column when it is a leaf row (level > groupOrder.lenght) with no drill down icon when grouping is ["category","brand","product"]
                 totals: ["price","quantity"],
                 colProperties: colProperties,
                 onLabelClick: function(event) {

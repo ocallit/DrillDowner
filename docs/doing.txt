@@ -1,3 +1,250 @@
+    QUnit.module('DrillDowner Fetch Mode: Real _getRequestPayload', function() {
+
+        const container = '#test-container';
+
+        QUnit.test('Payload for single dimension groupOrder', function(assert) {
+            document.querySelector(container).innerHTML = '';
+
+            // Initialize with only one dimension: Product ("p")
+            const dd = new DrillDowner(container, testData, {
+                groupOrder: ["p"],
+                totals: ["rolls"]
+            });
+
+            const firstRow = document.querySelector(container + ' tr[data-level="0"]');
+            const payload = dd._getRequestPayload('expand', firstRow);
+
+            assert.equal(dd.options.groupOrder.length, 1, 'Verified groupOrder has only one element');
+            assert.equal(payload.requestDetails.groupingDimension, 'p', 'Correctly identified the single dimension');
+            assert.equal(payload.requestDetails.displayNames.length, 1, 'Hierarchy array has exactly one element');
+
+            // Alpha is the first element in natural sort for testData
+            assert.deepEqual(payload.requestDetails.displayNames, ["Alpha"], 'Hierarchy contains the correct single value');
+
+            dd.destroy();
+        });
+
+        QUnit.test('Payload hierarchy order for 3-level depth', function(assert) {
+            document.querySelector(container).innerHTML = '';
+
+            const dd = new DrillDowner(container, testData, {
+                groupOrder: ["p", "c", "w"],
+                totals: ["rolls"]
+            });
+
+            // Expand to Level 2 (Warehouse) to get a deep row
+            // Path: Alpha (0) -> Rojo (1) -> W1 (2)
+            dd.expandAll();
+
+            // Find the specific row for Warehouse W1 under Alpha/Rojo
+            // We use a selector that ensures we are looking at the 3rd level
+            const deepRow = document.querySelector(container + ' tr[data-level="2"]');
+
+            const payload = dd._getRequestPayload('expand', deepRow);
+
+            assert.equal(payload.requestDetails.displayNames.length, 3, 'Payload captured exactly 3 hierarchy elements');
+
+            // Verify order: [Level 0, Level 1, Level 2]
+            const expectedHierarchy = ["Alpha", "Rojo", "W1"];
+            assert.deepEqual(payload.requestDetails.displayNames, expectedHierarchy, 'Hierarchy elements are in the correct top-to-bottom order');
+
+            // Verify the dimension matches the last element in the hierarchy
+            assert.equal(payload.requestDetails.groupingDimension, 'w', 'Dimension correctly matches the clicked level (w)');
+
+            dd.destroy();
+        });
+
+        QUnit.test('Action "expand": Verify payload from real rendered row', function(assert) {
+            document.querySelector(container).innerHTML = '';
+
+            // 1. Initialize real instance
+            const dd = new DrillDowner(container, testData, {
+                groupOrder: ["p", "c", "w"],
+                totals: ["rolls"],
+                colProperties: testColProperties
+            });
+
+            // 2. Target the first rendered Level 0 row (e.g., "Zeta")
+            const firstRow = document.querySelector(container + ' tr[data-level="0"]');
+            const drillIcon = firstRow.querySelector('.drillDowner_drill_icon');
+
+            // 3. Generate payload using the actual DOM element
+            const payload = dd._getRequestPayload('expand', drillIcon);
+
+            // 4. Assertions based on real testData ("Zeta" is the first sorted item usually)
+            assert.equal(payload.action, 'expand', 'Action is expand');
+            assert.equal(payload.requestDetails.level, 0, 'Level 0 correctly detected from DOM');
+            assert.equal(payload.requestDetails.expandingLevel, 1, 'Expanding level is 1');
+            assert.equal(payload.requestDetails.groupingDimension, 'p', 'Dimension "p" detected from real row');
+
+            // Verify the hierarchy array matches the real label in the row
+            const expectedName = firstRow.querySelector('b').innerText.trim();
+            assert.deepEqual(payload.requestDetails.displayNames, [expectedName], 'Hierarchy matches real row text');
+
+            dd.destroy();
+        });
+
+        QUnit.test('Payload verification when switching from Ledger to Grouped', function(assert) {
+            const dd = initTest({
+                ledger: [{ label: "Flat View", cols: ["p", "c"] }],
+                groupOrder: [] // Start in ledger
+            });
+
+            // 1. Verify payload in ledger context (action should likely be expandToLevel 0)
+            const ledgerPayload = dd._getRequestPayload('expandToLevel');
+            assert.ok(ledgerPayload.isLedger || ledgerPayload.ledgerIndex !== -1, 'Payload identifies ledger mode');
+
+            // 2. Switch to grouped mode
+            dd.changeGroupOrder(["p", "c"]);
+
+            // 3. Verify expansion payload now uses dimensions
+            const groupedRow = document.querySelector(container + ' tr[data-level="0"]');
+            const groupedPayload = dd._getRequestPayload('expand', groupedRow);
+            assert.equal(groupedPayload.requestDetails.groupingDimension, 'p', 'Payload correctly reset to grouped dimensions');
+
+            dd.destroy();
+        });
+
+        QUnit.test('Action "expandToLevel": Verify payload from real breadcrumb', function(assert) {
+            const controls = '#test-controls';
+            document.querySelector(container).innerHTML = '';
+            document.querySelector(controls).innerHTML = '';
+
+            const dd = new DrillDowner(container, testData, {
+                groupOrder: ["p", "c", "w"],
+                controlsSelector: controls
+            });
+
+            // 1. Target the "Color" breadcrumb (Level 1)
+            const colorBreadcrumb = document.querySelector(controls + ' .drillDowner_breadcrumb_item[data-level="1"]');
+
+            // 2. Generate payload from the real button
+            const payload = dd._getRequestPayload('expandToLevel', colorBreadcrumb);
+
+            assert.equal(payload.requestDetails.level, 1, 'Captured Level 1 from breadcrumb');
+            assert.equal(payload.requestDetails.groupingDimension, 'c', 'Dimension "c" correctly mapped');
+            assert.deepEqual(payload.requestDetails.displayNames, [], 'Display names empty for level-wide request');
+
+            dd.destroy();
+        });
+
+        QUnit.test('Payload consistency after real groupOrder change', function(assert) {
+            document.querySelector(container).innerHTML = '';
+
+            const dd = new DrillDowner(container, testData, {
+                groupOrder: ["p", "c"]
+            });
+
+            // 1. Change grouping to Color first
+            dd.changeGroupOrder(["c", "p"]);
+
+            // 2. Target a new Level 0 row (now a Color row, e.g., "Amarillo")
+            const newFirstRow = document.querySelector(container + ' tr[data-level="0"]');
+            const payload = dd._getRequestPayload('expand', newFirstRow);
+
+            assert.deepEqual(payload.groupOrder, ["c", "p"], 'Payload reflects new groupOrder');
+            assert.equal(payload.requestDetails.groupingDimension, 'c', 'Dimension is now "c"');
+
+            dd.destroy();
+        });
+    });
+
+    QUnit.module('DrillDowner Fetch Mode: Strict Payload Validation', function() {
+        const container = '#test-container';
+        const controls = '#test-controls';
+
+        // Helper for exhaustive JSON validation
+        const assertFullPayload = (assert, payload, expectedAction, expectedLevel, expectedDimension, expectedHierarchy = []) => {
+            // 1. Check Action and Metadata
+            assert.equal(payload.action, expectedAction, `Action must be ${expectedAction}`);
+            assert.deepEqual(payload.requestedTotals, ["rolls", "quantity"], "Payload must include all requested totals");
+            assert.deepEqual(payload.requestedColumns, ["status"], "Payload must include all requested columns");
+
+            // 2. Check Request Details
+            assert.equal(payload.requestDetails.level, expectedLevel, `Level correctly identified as ${expectedLevel}`);
+            assert.equal(payload.requestDetails.groupingDimension, expectedDimension, `Dimension correctly mapped to ${expectedDimension}`);
+            assert.deepEqual(payload.requestDetails.displayNames, expectedHierarchy, "Hierarchy array matches expected path");
+
+            // 3. Ensure no "leaked" or unexpected keys
+            const topKeys = Object.keys(payload).sort();
+            assert.deepEqual(topKeys, ["action", "groupOrder", "requestDetails", "requestedColumns", "requestedTotals"], "Payload structure is strictly defined");
+        };
+
+        QUnit.test('Breadcrumb Arrow Toggles: Payload Verification', function(assert) {
+            document.querySelector(container).innerHTML = '';
+            document.querySelector(controls).innerHTML = '';
+
+            const dd = new DrillDowner(container, testData, {
+                groupOrder: ["p", "c", "w"],
+                columns: ["status"],
+                totals: ["rolls", "quantity"],
+                controlsSelector: controls
+            });
+
+            // 1. Test Arrow at Level 0 (Product -> Color)
+            const arrow0 = document.querySelector(controls + ' .drillDowner_breadcrumb_arrow[data-arrow-level="0"]');
+
+            // Case A: Arrow is collapsed (pointing to Level 1)
+            arrow0.classList.remove('drillDowner_expanded');
+            arrow0.classList.add('drillDowner_collapsed');
+            let payload = dd._getRequestPayload('expandToLevel', arrow0);
+            // If collapsed, clicking arrow expands to next level (Level 1 / Color)
+            assertFullPayload(assert, payload, 'expandToLevel', 1, 'c');
+
+            // Case B: Arrow is expanded (pointing back to Level 0)
+            arrow0.classList.remove('drillDowner_collapsed');
+            arrow0.classList.add('drillDowner_expanded');
+            payload = dd._getRequestPayload('expandToLevel', arrow0);
+            // If expanded, clicking arrow collapses back to current level (Level 0 / Product)
+            assertFullPayload(assert, payload, 'expandToLevel', 0, 'p');
+
+            dd.destroy();
+        });
+
+        QUnit.test('Deep Expand Payload: Exhaustive Element Check', function(assert) {
+            document.querySelector(container).innerHTML = '';
+
+            const dd = new DrillDowner(container, testData, {
+                groupOrder: ["p", "c", "w"],
+                columns: ["status"],
+                totals: ["rolls", "quantity"]
+            });
+
+            // Expand to a deep level: Alpha -> Rojo -> W1
+            dd.expandAll();
+            const deepRow = document.querySelector(container + ' tr[data-level="2"]'); // Warehouse level
+            const payload = dd._getRequestPayload('expand', deepRow);
+
+            // Verify every element sent to server
+            assertFullPayload(assert, payload, 'expand', 2, 'w', ["Alpha", "Rojo", "W1"]);
+            assert.ok(payload.requestDetails.rowId.includes('row_Alpha_Rojo_W1'), "RowId is present for row-specific expansion");
+
+            dd.destroy();
+        });
+
+        QUnit.test('Payload adapts to dynamic option changes', function(assert) {
+            document.querySelector(container).innerHTML = '';
+            const dd = new DrillDowner(container, testData, {
+                groupOrder: ["p"],
+                totals: ["rolls"]
+            });
+
+            // Dynamically modify options before request
+            dd.options.totals = ["rolls", "quantity"];
+            dd.options.columns = ["status"];
+
+            const row = document.querySelector(container + ' tr[data-level="0"]');
+            const payload = dd._getRequestPayload('expand', row);
+
+            // Verify payload picked up the new totals/columns
+            assert.deepEqual(payload.requestedTotals, ["rolls", "quantity"], "Updated totals reflected in payload");
+            assert.deepEqual(payload.requestedColumns, ["status"], "Updated columns reflected in payload");
+
+            dd.destroy();
+        });
+    });
+
+-- _________________________
 Task: Add mode: local as is, fetch where the server returns the data for
 - all rows at requested level, totals
 - all rows when a given row is expanded 1 level down
