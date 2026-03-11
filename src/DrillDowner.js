@@ -18,15 +18,16 @@ class DrillDowner {
             azBarOrientation: 'vertical',
             controlsSelector: null,
             showGrandTotals: true,
-            onLabelClick: null, // labelIno: (eventData) => void
+            onLabelClick: null,
+            onGroupOrderChange: null,
         }, options);
 
-        if (this.options.ledger && !Array.isArray(this.options.ledger)) {
+        if(this.options.ledger && !Array.isArray(this.options.ledger)) {
             this.options.ledger = [this.options.ledger];
         }
         this.options.ledger = this.options.ledger || [];
 
-        if (this.options.groupOrder.length === 0 && this.options.ledger.length > 0) {
+        if(this.options.groupOrder.length === 0 && this.options.ledger.length > 0) {
             this.activeLedgerIndex = 0;
         } else {
             this.activeLedgerIndex = -1;
@@ -49,6 +50,8 @@ class DrillDowner {
         }).compare;
 
         this.grandTotals = this._calculateGrandTotals();
+
+        this._boundOnTableClick = this._onTableClick.bind(this);
         this._onDrillClick = this._onDrillClick.bind(this);
         this._onAZClick = this._onAZClick.bind(this);
 
@@ -61,29 +64,29 @@ class DrillDowner {
     }
 
     changeGroupOrder(newOrder) {
-        if (!this.controls) {
+        if(!this.controls) {
             this.options.groupOrder = newOrder;
             this.render();
             return this;
         }
 
         const select = this.controls.querySelector('select.drillDowner_modern_select');
-        if (!select) return this;
+        if(!select) return this;
 
         const targetValue = newOrder.join(',');
         let found = false;
 
-        if (this.options.groupOrderCombinations) {
-            for (let i = 0; i < this.options.groupOrderCombinations.length; i++) {
-                if (this.options.groupOrderCombinations[i].join(',') === targetValue) {
+        if(this.options.groupOrderCombinations) {
+            for(let i = 0; i < this.options.groupOrderCombinations.length; i++) {
+                if(this.options.groupOrderCombinations[i].join(',') === targetValue) {
                     select.selectedIndex = i;
                     found = true;
                     break;
                 }
             }
         } else {
-            for (let i = 0; i < select.options.length; i++) {
-                if (select.options[i].value === targetValue) {
+            for(let i = 0; i < select.options.length; i++) {
+                if(select.options[i].value === targetValue) {
                     select.selectedIndex = i;
                     found = true;
                     break;
@@ -91,7 +94,7 @@ class DrillDowner {
             }
         }
 
-        if (!found) {
+        if(!found) {
             const label = newOrder.map(col => this._getColLabel(col)).join(' → ');
             select.add(new Option(label, targetValue));
             select.value = targetValue;
@@ -129,31 +132,30 @@ class DrillDowner {
         return this;
     }
 
-    collapseAll() { return this.collapseToLevel(0); }
-    expandAll() { return this.collapseToLevel(this.options.groupOrder.length ); }
+    collapseAll() {
+        return this.collapseToLevel(0);
+    }
+
+    expandAll() {
+        return this.collapseToLevel(this.options.groupOrder.length);
+    }
 
     // Label click
     _onTableClick(e) {
-        if (typeof this.options.onLabelClick !== 'function') return;
+        if(typeof this.options.onLabelClick !== 'function') return;
 
         const labelSpan = e.target.closest('span[class*="drillDowner_indent_"]');
-        if (!labelSpan) return;
-        if (e.target.classList.contains('drillDowner_drill_icon')) return;
+        if(!labelSpan) return;
+        if(e.target.classList.contains('drillDowner_drill_icon')) return;
 
         const row = labelSpan.closest('tr');
-        if (!row) return;
+        if(!row) return;
 
-        // 1. Get the depth level (0 = Warehouse, 1 = Category, 2 = Product)
+
         const level = parseInt(row.getAttribute('data-level') || "0");
-
-        // 2. Get the specific column name for this level (e.g., "Warehouse")
-        // This is how the code knows "Main WH" belongs to "Warehouse"
-        const clickedColumn = this.options.groupOrder[level];
-
-        // 3. Get the full path of Values (e.g., ["Main WH", "Electronics"])
         const valuePath = this._getHierarchyForRow(row);
 
-        // 4. Map Values to Columns to create a structured object
+        // Map Values to Columns to create a structured object
         // Result: { Warehouse: "Main WH", Category: "Electronics" }
         const pathMap = {};
         valuePath.forEach((val, index) => {
@@ -162,12 +164,15 @@ class DrillDowner {
         });
 
         const context = {
-            label: labelSpan.innerText.trim(), // "Main WH"
-            level: level,                      // 0
-            column: clickedColumn,             // "Warehouse" <--- THE KEY LINK
-            hierarchyValues: valuePath,        // ["Main WH"]
-            hierarchyMap: pathMap,             // { Warehouse: "Main WH" }
-            rowElement: row
+            label: labelSpan.innerText.trim(),
+            level: level,
+            column: this.options.groupOrder[level],
+            isLeaf: level === level > this.options.groupOrder.length,
+            hierarchyValues: valuePath,
+            hierarchyMap: pathMap,
+            groupOrder: [...this.options.groupOrder],
+            rowElement: row,
+            options: this.options
         };
 
         this.options.onLabelClick(context);
@@ -178,16 +183,14 @@ class DrillDowner {
         let current = row;
 
         while (current) {
-            // Extract text from the indented span
             const span = current.querySelector('span[class*="drillDowner_indent_"]');
             if (span) {
-                // Clone to remove children (like the drill icon) to get just the text
                 const clone = span.cloneNode(true);
-                clone.querySelectorAll('.drillDowner_drill_icon').forEach(el => el.remove());
+                // Remove the icon AND the child count badge to get the clean raw text
+                clone.querySelectorAll('.drillDowner_drill_icon, .drillDowner_child_count').forEach(el => el.remove());
                 chain.unshift(clone.innerText.trim());
             }
 
-            // Move up to parent using the internal data attribute
             const parentId = current.getAttribute('data-parent');
             if (!parentId || parentId.trim() === "") break;
             current = document.getElementById(parentId);
@@ -208,15 +211,15 @@ class DrillDowner {
     render() {
         this.grandTotals = this._calculateGrandTotals();
 
-        if (this.options.groupOrder.length === 0 && this.activeLedgerIndex >= 0 && this.options.ledger[this.activeLedgerIndex]) {
+        if(this.options.groupOrder.length === 0 && this.activeLedgerIndex >= 0 && this.options.ledger[this.activeLedgerIndex]) {
             const activeLedger = this.options.ledger[this.activeLedgerIndex];
-            if (activeLedger.cols) {
+            if(activeLedger.cols) {
                 // Filter out totals to avoid duplicate undefined text columns
                 this.options.columns = activeLedger.cols.filter(c => !this.options.totals.includes(c));
             }
         }
 
-        if (this.options.groupOrder.length > 0) this.activeLedgerIndex = -1;
+        if(this.options.groupOrder.length > 0) this.activeLedgerIndex = -1;
 
         if(this.azBar) this.azBar = this._removeAllEventListeners(this.azBar);
         if(this.table) this.table = this._removeAllEventListeners(this.table);
@@ -233,10 +236,10 @@ class DrillDowner {
     // ---------- Internal Logic ----------
 
     _renderControls() {
-        if (!this.controls) return;
+        if(!this.controls) return;
 
         let container = this.controls.querySelector('.drillDowner_controls_container');
-        if (!container) {
+        if(!container) {
             this.controls.innerHTML = `
                 <div class="drillDowner_controls_container">
                     <div class="drillDowner_breadcrumb_nav"></div>
@@ -250,15 +253,14 @@ class DrillDowner {
     }
 
     _renderGroupingSelect(div) {
-        if (div.querySelector('select')) return;
+        if(div.querySelector('select')) return;
 
         let optionsHtml = '';
-        if (this.options.groupOrderCombinations) {
+        if(this.options.groupOrderCombinations) {
             this.options.groupOrderCombinations.forEach((combo, idx) => {
                 optionsHtml += `<option value="${idx}">${combo.map(k => this._getColLabel(k)).join(' → ')}</option>`;
             });
-        }
-        else if (this.options.groupOrder.length > 0) {
+        } else if(this.options.groupOrder.length > 0) {
             const perms = this._generatePermutations(this.options.groupOrder.length);
             perms.slice(0, 9).forEach(p => {
                 const keys = p.map(i => this.options.groupOrder[i]);
@@ -277,15 +279,15 @@ class DrillDowner {
 
         div.querySelector('select').addEventListener('change', (e) => {
             const val = e.target.value;
-            if (val.startsWith('__LEDGER_')) {
+            if(val.startsWith('__LEDGER_')) {
                 this.activeLedgerIndex = parseInt(val.replace('__LEDGER_', ''));
                 this.options.groupOrder = [];
             } else {
                 this.activeLedgerIndex = -1;
                 this.options.columns = [...this._defaultColumns];
 
-                if (this.options.groupOrderCombinations) {
-                    if (/^\d+$/.test(val)) {
+                if(this.options.groupOrderCombinations) {
+                    if(/^\d+$/.test(val)) {
                         this.options.groupOrder = this.options.groupOrderCombinations[parseInt(val)];
                     } else {
                         this.options.groupOrder = val.split(',');
@@ -303,25 +305,25 @@ class DrillDowner {
     _renderBreadcrumbs(nav) {
         nav.innerHTML = '';
         const items = [];
-        if (this.options.groupOrder.length > 0) {
+        if(this.options.groupOrder.length > 0) {
             this.options.groupOrder.forEach((key, i) => {
                 items.push(`<button type="button" class="drillDowner_breadcrumb_item" data-level="${i}">
                     <span>${this._getGroupIcon(key)} ${this._getColLabel(key)}</span>
                 </button>`);
-                if (i < this.options.groupOrder.length - 1) {
+                if(i < this.options.groupOrder.length - 1) {
                     items.push(`<button type="button" class="drillDowner_breadcrumb_arrow drillDowner_collapsed" data-arrow-level="${i}">
                         <span class="drillDowner_arrow_icon">▶</span>
                     </button>`);
                 }
             });
-        } else if (this.activeLedgerIndex >= 0) {
+        } else if(this.activeLedgerIndex >= 0) {
             const label = this.options.ledger[this.activeLedgerIndex].label;
             items.push(`<span class="drillDowner_breadcrumb_item" style="cursor:default"><b>${label}</b></span>`);
         }
         nav.innerHTML = items.join('');
 
         nav.querySelectorAll('.drillDowner_breadcrumb_item').forEach(btn => {
-            if (btn.dataset.level !== undefined) {
+            if(btn.dataset.level !== undefined) {
                 btn.onclick = () => this.collapseToLevel(parseInt(btn.dataset.level));
             }
         });
@@ -334,7 +336,7 @@ class DrillDowner {
     }
 
     _updateBreadcrumbVisuals(level) {
-        if (!this.controls) return;
+        if(!this.controls) return;
         this.controls.querySelectorAll('.drillDowner_breadcrumb_arrow').forEach((arrow, i) => {
             const isExpanded = i < level;
             arrow.classList.toggle('drillDowner_expanded', isExpanded);
@@ -357,11 +359,11 @@ class DrillDowner {
         const hr = thead.insertRow();
         allHeaders.forEach((h, i) => {
             const th = document.createElement('th');
-            if (i > 0 && i <= this.options.totals.length) {
-                const col = this.options.totals[i-1];
+            if(i > 0 && i <= this.options.totals.length) {
+                const col = this.options.totals[i - 1];
                 th.className = this._getColLabelClass(col) + (this.options.showGrandTotals ? " drillDownerThTotal" : "");
                 th.innerHTML = this.options.showGrandTotals ? `${h}<br><small>${this._formatGrandTotal(col)}</small>` : h;
-            } else if (i > this.options.totals.length) {
+            } else if(i > this.options.totals.length) {
                 th.className = this._getColLabelClass(this.options.columns[i - this.options.totals.length - 1]);
                 th.textContent = h;
             } else th.textContent = h;
@@ -371,7 +373,7 @@ class DrillDowner {
         const tbody = table.createTBody();
 
         // --- LEDGER VIEW (FLAT) ---
-        if (this.options.groupOrder.length === 0 && this.activeLedgerIndex >= 0) {
+        if(this.options.groupOrder.length === 0 && this.activeLedgerIndex >= 0) {
             const led = this.options.ledger[this.activeLedgerIndex];
 
             // --- PASS 1: Calculate Running Balances in Chronological Order (Ascending) ---
@@ -394,7 +396,7 @@ class DrillDowner {
                 const itemOverrides = {};
                 this.options.totals.forEach(col => {
                     const props = this._getColProperty(col, 'balanceBehavior');
-                    if (props) {
+                    if(props) {
                         const impact = this._calculateRowImpact(item, col);
                         runningTotals[col] += impact;
                         itemOverrides[col] = runningTotals[col];
@@ -423,7 +425,7 @@ class DrillDowner {
                     const td = tr.insertCell();
                     td.className = 'drillDowner_num';
                     const props = this._getColProperty(col, 'balanceBehavior');
-                    if (props && typeof props.initialBalance === 'number') {
+                    if(props && typeof props.initialBalance === 'number') {
                         const dec = this._getColDecimals(col);
                         const fmt = this._getColFormatter(col);
                         const val = props.initialBalance;
@@ -438,7 +440,7 @@ class DrillDowner {
                 this.options.columns.forEach(col => {
                     const td = tr.insertCell();
                     td.className = this._getColClass(col);
-                    if (!labelSet) {
+                    if(!labelSet) {
                         td.innerHTML = 'Initial Balance';
                         labelSet = true;
                     } else {
@@ -448,18 +450,18 @@ class DrillDowner {
             };
 
             // IF ASCENDING: Render Top
-            if (hasInitialBalance && !isDescending) renderInitialRow();
+            if(hasInitialBalance && !isDescending) renderInitialRow();
 
             this.dataArr.forEach((item, idx) => {
                 const tr = tbody.insertRow();
-                if (idx % 2) tr.className = 'drillDowner_even';
+                if(idx % 2) tr.className = 'drillDowner_even';
                 tr.insertCell().innerHTML = `<span class="drillDowner_indent_0">${idx + 1}</span>`;
                 const rowOverrides = balanceMap.get(item) || {};
                 this._appendDataCells(tr, item, null, true, rowOverrides);
             });
 
             // IF DESCENDING: Render Bottom (Just above Footer)
-            if (hasInitialBalance && isDescending) renderInitialRow();
+            if(hasInitialBalance && isDescending) renderInitialRow();
 
             // --- GROUPED VIEW (HIERARCHICAL) ---
         } else {
@@ -467,30 +469,40 @@ class DrillDowner {
             this._buildFlatRows(this.dataArr, this.options.groupOrder, 0, {}, [], tbody);
         }
 
-        if (this.options.showGrandTotals) {
+        if(this.options.showGrandTotals) {
             const tf = table.createTFoot();
             const tr = tf.insertRow();
             allHeaders.forEach((_, i) => {
                 const td = tr.insertCell();
-                if (i === 0) { td.innerHTML = '<b>Total</b>'; td.className = "drillDowner_right"; }
-                else if (i <= this.options.totals.length) {
-                    const col = this.options.totals[i-1];
+                if(i === 0) {
+                    td.innerHTML = '<b>Total</b>';
+                    td.className = "drillDowner_right";
+                } else if(i <= this.options.totals.length) {
+                    const col = this.options.totals[i - 1];
                     td.className = "drillDowner_num drillDownerTfootTotal " + this._getColLabelClass(col);
                     td.innerHTML = this._formatGrandTotal(col);
                 }
             });
         }
         this.container.appendChild(table);
+        if(this.table)
+            this.table.removeEventListener('click', this._boundOnTableClick);
         this.table = table;
+        this.table.addEventListener('click', this._boundOnTableClick);
+
         table.querySelectorAll('.drillDowner_drill_icon').forEach(i => i.onclick = (e) => this._onDrillClick(e));
-        this.table.addEventListener('click', (e) => this._onTableClick(e));
+
+
     }
 
+    _idCounter = 1;
     _buildFlatRows(data, groupOrder, level, parents, rows, tbody) {
-        if (level >= groupOrder.length) return;
+        if(level >= groupOrder.length) return;
         const col = groupOrder[level];
         const grouped = {};
-        data.forEach(r => { (grouped[r[col]] = grouped[r[col]] || []).push(r); });
+        data.forEach(r => {
+            (grouped[r[col]] = grouped[r[col]] || []).push(r);
+        });
 
         Object.keys(grouped).forEach((key, i) => {
             const gData = grouped[key];
@@ -501,14 +513,16 @@ class DrillDowner {
             const tr = tbody.insertRow();
             tr.id = rowId;
             tr.setAttribute('data-level', level);
+            tr.setAttribute('data-dimension', col);
+            tr.setAttribute('data-display-names', JSON.stringify(keys));
             tr.setAttribute('data-parent', level === 0 ? " " : this.options.idPrefix + "row_" + groupOrder.slice(0, level).map(c => this._sanitizeIdPart(parents[c])).join("_"));
-            if (i % 2) tr.classList.add('drillDowner_even');
-            if (i === 0) tr.classList.add('drillDowner_first_group');
+            if(i % 2) tr.classList.add('drillDowner_even');
+            if(i === 0) tr.classList.add('drillDowner_first_group');
 
             let anchor = " ";
-            if (level === 0) {
+            if(level === 0) {
                 const char = String(key)[0]?.toUpperCase();
-                if (char) anchor = `<span id="${this.options.idPrefix}az${this._sanitizeIdPart(char)}"></span>`;
+                if(char) anchor = `<span id="${this.options.idPrefix}az${this._sanitizeIdPart(char)}"></span>`;
             }
 
             const cell = tr.insertCell();
@@ -519,13 +533,18 @@ class DrillDowner {
 
             this._buildFlatRows(gData, groupOrder, level + 1, {...parents, [col]: key}, rows, tbody);
 
-            if (level === groupOrder.length - 1) {
+            if(level === groupOrder.length - 1) {
                 gData.forEach((item, idx) => {
                     const detailRow = tbody.insertRow();
-                    detailRow.id = rowId + "_detail_" + idx;
+                    detailRow.id =  rowId + "_detail_" + idx;
                     detailRow.setAttribute('data-level', level + 1);
                     detailRow.setAttribute('data-parent', rowId);
-                    if (idx % 2) detailRow.classList.add('drillDowner_even');
+                    detailRow.setAttribute('data-dimension', col);
+                    console.log("_____Detail row created for dimension:", col, item[col]);
+                    const currentPath = [...keys, item[col]];
+                    detailRow.setAttribute('data-display-names', JSON.stringify(currentPath));
+
+                    if(idx % 2) detailRow.classList.add('drillDowner_even');
 
                     const indentCell = detailRow.insertCell();
                     indentCell.innerHTML = `<span class="drillDowner_indent_${level + 1}">${item[col]}</span>`;
@@ -543,19 +562,18 @@ class DrillDowner {
             const dec = this._getColDecimals(col);
             const fmt = this._getColFormatter(col);
 
-            if (gData) {
+            if(gData) {
                 // --- GROUPED VIEW ---
                 const subBy = this._getColProperty(col, 'subTotalBy');
-                if (!subBy) {
+                if(!subBy) {
                     let val;
-                    if (this._getColProperty(col, 'balanceBehavior')) {
+                    if(this._getColProperty(col, 'balanceBehavior')) {
                         val = gData.reduce((s, r) => s + this._calculateRowImpact(r, col), 0);
                     } else {
                         val = gData.reduce((s, r) => s + (Number(r[col]) || 0), 0);
                     }
                     td.innerHTML = fmt ? fmt(val, item) : DrillDowner.formatNumber(val, dec);
-                }
-                else {
+                } else {
                     const sub = {};
                     gData.forEach(r => {
                         const v = this._getColProperty(col, 'balanceBehavior')
@@ -569,13 +587,11 @@ class DrillDowner {
             } else {
                 // --- LEDGER VIEW ---
                 let val;
-                if (overrides && overrides.hasOwnProperty(col)) {
+                if(overrides && overrides.hasOwnProperty(col)) {
                     val = overrides[col];
-                }
-                else if (this._getColProperty(col, 'balanceBehavior')) {
+                } else if(this._getColProperty(col, 'balanceBehavior')) {
                     val = this._calculateRowImpact(item, col);
-                }
-                else {
+                } else {
                     val = item[col];
                 }
                 td.innerHTML = fmt ? fmt(val, item) : DrillDowner.formatNumber(val, dec);
@@ -585,21 +601,29 @@ class DrillDowner {
             const td = tr.insertCell();
             td.className = this._getColClass(col);
             let val = "";
-            if (gData && this._getColTogglesUp(col)) val = Array.from(new Set(gData.map(r => r[col]))).join(', ');
-            else if (!gData || isLeaf) val = item[col];
+            if(gData && this._getColTogglesUp(col)) val = Array.from(new Set(gData.map(r => r[col]))).join(', ');
+            else if(!gData || isLeaf) val = item[col];
             const fmt = this._getColFormatter(col);
             td.innerHTML = fmt ? fmt(val, item) : val;
         });
     }
 
-    _getColProperty(c, p, f = null) { return this.options.colProperties[c]?.[p] ?? f; }
-    _getColDecimals(c) { return this._getColProperty(c, 'decimals', 2); }
-    _getColLabel(c) { return this._getColProperty(c, 'label', c.charAt(0).toUpperCase() + c.slice(1)); }
-    _getGroupIcon(c) { return this._getColProperty(c, 'icon', ''); }
-    _getColClass(c) { return this._getColProperty(c, 'class', ''); }
-    _getColLabelClass(c) { return this._getColProperty(c, 'labelClass', ''); }
-    _getColTogglesUp(c) { return this._getColProperty(c, 'togglesUp', false); }
-    _getColFormatter(c) { return this._getColProperty(c, 'formatter', null); }
+    _getColProperty(c, p, defautValue = null) {return this.options.colProperties[c]?.[p] ?? defautValue;}
+
+    _getColDecimals(c) {return this._getColProperty(c, 'decimals', 2);}
+
+    _getColLabel(c) {return this._getColProperty(c, 'label', c.charAt(0).toUpperCase() + c.slice(1));}
+
+    _getGroupIcon(c) {return this._getColProperty(c, 'icon', '');}
+
+    _getColClass(c) {return this._getColProperty(c, 'class', '');}
+
+    _getColLabelClass(c) {return this._getColProperty(c, 'labelClass', '');}
+
+    _getColTogglesUp(c) {return this._getColProperty(c, 'togglesUp', false);}
+
+    _getColFormatter(c) {return this._getColProperty(c, 'formatter', null);}
+
     _sanitizeIdPart(value) {
         return String(value ?? '')
             .normalize('NFKD')
@@ -609,13 +633,17 @@ class DrillDowner {
 
     _calculateRowImpact(row, colKey) {
         const props = this._getColProperty(colKey, 'balanceBehavior');
-        if (!props) return Number(row[colKey]) || 0;
+        if(!props) return Number(row[colKey]) || 0;
         let val = 0;
-        if (Array.isArray(props.add)) {
-            props.add.forEach(c => { val += (Number(row[c]) || 0); });
+        if(Array.isArray(props.add)) {
+            props.add.forEach(c => {
+                val += (Number(row[c]) || 0);
+            });
         }
-        if (Array.isArray(props.subtract)) {
-            props.subtract.forEach(c => { val -= (Number(row[c]) || 0); });
+        if(Array.isArray(props.subtract)) {
+            props.subtract.forEach(c => {
+                val -= (Number(row[c]) || 0);
+            });
         }
         return val;
     }
@@ -630,9 +658,12 @@ class DrillDowner {
         const setVisible = (pId, vis) => {
             this.table.querySelectorAll(`tr[data-parent="${pId}"]`).forEach(r => {
                 r.style.display = vis ? '' : 'none';
-                if (!vis) {
+                if(!vis) {
                     const i = r.querySelector('.drillDowner_drill_icon');
-                    if (i) { i.classList.remove('drillDowner_drill_expanded'); i.classList.add('drillDowner_drill_collapsed'); }
+                    if(i) {
+                        i.classList.remove('drillDowner_drill_expanded');
+                        i.classList.add('drillDowner_drill_collapsed');
+                    }
                     setVisible(r.id, false);
                 }
             });
@@ -640,14 +671,17 @@ class DrillDowner {
         setVisible(rowId, !expanded);
     }
 
-    _onAZClick() { setTimeout(() => window.scrollBy(0, -30), 1); }
+    _onAZClick() {setTimeout(() => window.scrollBy(0, -30), 1);}
 
     _renderAZBar() {
-        if(!this.azBar || this.options.groupOrder.length === 0) { if(this.azBar) this.azBar.innerHTML = ''; return; }
+        if(!this.azBar || this.options.groupOrder.length === 0) {
+            if(this.azBar) this.azBar.innerHTML = '';
+            return;
+        }
         const col = this.options.groupOrder[0];
-        const letters = new Set(this.dataArr.map(x => String(x[col]||"")[0]?.toUpperCase()));
+        const letters = new Set(this.dataArr.map(x => String(x[col] || "")[0]?.toUpperCase()));
         let html = '';
-        for (let i = 65; i <= 90; i++) {
+        for(let i = 65; i <= 90; i++) {
             const c = String.fromCharCode(i);
             html += letters.has(c) ? `<div><a href="#${this.options.idPrefix}az${this._sanitizeIdPart(c)}" aria-label="Ir a la letra ${c}" class="drillDowner_az_link">${c}</a></div>` : `<div class="drillDowner_az_dimmed">${c}</div>`;
         }
@@ -657,13 +691,13 @@ class DrillDowner {
     }
 
     _applyAzBarOrientation() {
-        if (!this.azBar) return;
+        if(!this.azBar) return;
         this.azBar.classList.add('drillDowner_az_bar');
 
         const ori = (this.options.azBarOrientation || 'vertical').toLowerCase();
         const isH = (ori === 'horizontal' || ori === 'h' || ori === 'row');
 
-        if (isH) {
+        if(isH) {
             this.azBar.classList.add('drillDowner_az_bar_horizontal');
         } else {
             this.azBar.classList.remove('drillDowner_az_bar_horizontal');
@@ -674,9 +708,9 @@ class DrillDowner {
         const t = {};
         this.options.totals.forEach(c => {
             const sub = this._getColProperty(c, 'subTotalBy');
-            if (!sub) {
+            if(!sub) {
                 const props = this._getColProperty(c, 'balanceBehavior');
-                if (props) {
+                if(props) {
                     const startBal = (typeof props.initialBalance === 'number') ? props.initialBalance : 0;
                     t[c] = this.dataArr.reduce((s, r) => s + this._calculateRowImpact(r, c), startBal);
                 } else {
@@ -685,7 +719,7 @@ class DrillDowner {
             } else {
                 const res = {};
                 this.dataArr.forEach(r => {
-                    if (r[c] != null || this._getColProperty(c, 'balanceBehavior')) {
+                    if(r[c] != null || this._getColProperty(c, 'balanceBehavior')) {
                         const val = this._getColProperty(c, 'balanceBehavior')
                             ? this._calculateRowImpact(r, c)
                             : (Number(r[c]) || 0);
@@ -700,63 +734,62 @@ class DrillDowner {
 
     _formatGrandTotal(c) {
         const val = this.grandTotals[c], dec = this._getColDecimals(c);
-        if (typeof val !== 'object') return DrillDowner.formatNumber(val, dec);
+        if(typeof val !== 'object') return DrillDowner.formatNumber(val, dec);
         return Object.entries(val).map(([s, v]) => `${DrillDowner.formatNumber(v, dec)} ${s}`).join('<br>') || '-';
     }
 
     _sortData(arr, keys) {
         if(!keys?.length) return arr;
         return arr.sort((a, b) => {
-            for (let k of keys) {
+            for(let k of keys) {
                 const desc = k.startsWith('-');
                 const key = desc ? k.substring(1) : k;
-                const r = this._natSort(String(a[key]||""), String(b[key]||""));
-                if (r !== 0) return desc ? -r : r;
-            } return 0;
+                const r = this._natSort(String(a[key] || ""), String(b[key] || ""));
+                if(r !== 0) return desc ? -r : r;
+            }
+            return 0;
         });
     }
 
     static formatNumber(n, d) {
-        if (n == null || isNaN(n) || n === '') return n || '';
+        if(n == null || isNaN(n) || n === '') return n || '';
         let parts = Number(n).toFixed(d).split('.');
         parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
         return parts.join('.');
     }
 
-    // Define array once on the class to avoid memory allocation on every render
     static _SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
     static formatDate(value, includeTime = false) {
-        if (!value) return "";
+        if(!value) return "";
 
         let y, m, d, h = 0, min = 0;
         let hasTime = false;
 
-        if (value instanceof Date) {
-            if (isNaN(value.getTime())) return "";
+        if(value instanceof Date) {
+            if(isNaN(value.getTime())) return "";
             y = value.getFullYear();
             m = value.getMonth();
             d = value.getDate();
-            if (includeTime) {
+            if(includeTime) {
                 h = value.getHours();
                 min = value.getMinutes();
                 hasTime = true;
             }
-        }
-        else if (typeof value === 'string') {
+        } else if(typeof value === 'string') {
             const match = value.match(/^(\d{4})[-/]?(\d{2})[-/]?(\d{2})(?:[T\s](\d{2}):(\d{2}))?/);
-            if (!match) return value; // Return raw string if regex fails
+            if(!match) return value; // Return raw string if regex fails
 
             y = parseInt(match[1], 10);
             m = parseInt(match[2], 10) - 1; // 0-indexed
             d = parseInt(match[3], 10);
 
-            if (includeTime && match[4] && match[5]) {
+            if(includeTime && match[4] && match[5]) {
                 h = parseInt(match[4], 10);
                 min = parseInt(match[5], 10);
                 hasTime = true;
             }
-        }
-        else {
+        } else {
             return String(value);
         }
 
@@ -766,7 +799,7 @@ class DrillDowner {
         // Fully inlined template literal for minimal footprint
         let result = `${String(d).padStart(2, '0')}/${MMM}/${String(y).slice(-2)}`;
 
-        if (includeTime && hasTime) {
+        if(includeTime && hasTime) {
             result += ` ${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
         }
 
@@ -775,7 +808,7 @@ class DrillDowner {
 
 
     _removeAllEventListeners(el) {
-        if (!el) return el;
+        if(!el) return el;
         const clone = el.cloneNode(true);
         el.parentNode.replaceChild(clone, el);
         return clone;
@@ -784,16 +817,159 @@ class DrillDowner {
     _generatePermutations(n, limit = 9) {
         const res = [];
         const p = (a, s = 0) => {
-            if (res.length >= limit) return;
-            if (s === a.length - 1) { res.push([...a]); return; }
-            for (let i = s; i < a.length; i++) {
+            if(res.length >= limit) return;
+            if(s === a.length - 1) {
+                res.push([...a]);
+                return;
+            }
+            for(let i = s; i < a.length; i++) {
                 [a[s], a[i]] = [a[i], a[s]];
                 p(a, s + 1);
                 [a[s], a[i]] = [a[i], a[s]];
-                if (res.length >= limit) return;
+                if(res.length >= limit) return;
             }
         };
         p(Array.from({length: n}, (_, i) => i));
         return res;
     }
+
+    /**
+     * Finds a row based on the hierarchy array to avoid badly built ID issues
+     */
+    _findRowByHierarchy(displayNames) {
+        const targetPath = JSON.stringify(displayNames);
+        return Array.from(this.table.querySelectorAll('tr')).find(tr =>
+            tr.getAttribute('data-display-names') === targetPath
+        );
+    }
+    
+    /* region: mode remote/fetch ___________________________________________________________________________________ */
+
+    _getRequestPayload(action, target = null) {
+        const payload = {
+            action: action,
+            groupOrder: this.options.groupOrder,
+            requestedTotals: this.options.totals,
+            requestedColumns: this.options.columns,
+            requestDetails: {
+                level: 0,
+                expandingLevel: 0,
+                groupingDimension: null,
+                displayNames: [],
+                rowId: null
+            }
+        };
+
+        if (action === 'expand' && target) {
+            const row = target.closest('tr');
+            const level = parseInt(row.getAttribute('data-level') || 0);
+            payload.requestDetails = {
+                level: level,
+                expandingLevel: level + 1,
+                groupingDimension: row.getAttribute('data-dimension'),
+                displayNames: this._getHierarchyForRow(row),
+                rowId: row.id
+            };
+        } else if (action === 'expandToLevel') {
+            // Safe check for target and its dataset
+            let targetLevel = 0;
+            if (target) {
+                if (target.dataset.level !== undefined) {
+                    targetLevel = parseInt(target.dataset.level);
+                } else if (target.dataset.arrowLevel !== undefined) {
+                    const isExpanded = target.classList.contains('drillDowner_expanded');
+                    const arrowLvl = parseInt(target.dataset.arrowLevel);
+                    targetLevel = isExpanded ? arrowLvl : arrowLvl + 1;
+                }
+            }
+
+            payload.requestDetails.level = targetLevel;
+            payload.requestDetails.expandingLevel = targetLevel;
+            payload.requestDetails.groupingDimension = this.options.groupOrder[targetLevel];
+        }
+        return payload;
+    }
+
+    /**
+     * Processes the server response and updates the DOM.
+     * @param {Object} json - The JSON response from the server.
+     */
+    _fill(json) {
+        // 1. Handle Business/Logic Errors (Status 200 but success: false)
+        if (!json.success) {
+            alert(json.error_message || "A server error occurred.");
+            return;
+        }
+
+        const { data } = json;
+        const { action, rows, level, displayNames, grandTotals } = data;
+
+        // 2. Update Grand Totals if provided (usually for expandToLevel/change_grouping)
+        if (grandTotals) {
+            this.grandTotals = grandTotals;
+        }
+
+        if (action === 'expand') {
+            // Find the specific parent row to inject children under
+            const parentRow = this._findRowByHierarchy(displayNames);
+            if (!parentRow) return;
+
+            this._injectChildRows(parentRow, rows, level);
+        }
+        else if (action === 'expandToLevel' || action === 'change_grouping') {
+            // Complete table refresh for the new level/dimension
+            this.dataArr = rows; // Update local reference with the level's data
+            this.render();
+
+            // Ensure breadcrumbs reflect the target level
+            this._updateBreadcrumbVisuals(level);
+        }
+    }
+
+    /**
+     * Add,inject rows from server after expand
+     */
+    _injectChildRows(parentRow, rows, parentLevel) {
+        const tbody = this.table.tBodies[0];
+        let lastInsertedRow = parentRow;
+        const parentHierarchy = JSON.parse(parentRow.getAttribute('data-display-names') || "[]");
+
+        rows.forEach((rowData, idx) => {
+            const tr = tbody.insertRow(lastInsertedRow.sectionRowIndex + 1);
+            const currentLevel = parentLevel + 1;
+
+            // Use existing logic to determine dimension
+            const isLeaf = currentLevel >= this.options.groupOrder.length;
+            const dimensionKey = isLeaf ? this.options.groupOrder[parentLevel] : this.options.groupOrder[currentLevel];
+            const label = rowData[dimensionKey];
+
+            tr.id = this.options.idPrefix + "row_fetch_" + Math.random().toString(36).slice(2);
+            tr.setAttribute('data-level', currentLevel);
+            tr.setAttribute('data-parent', parentRow.id);
+            tr.setAttribute('data-dimension', dimensionKey); // Critical fix
+            const currentHierarchy = [...parentHierarchy, label];
+            tr.setAttribute('data-display-names', JSON.stringify(currentHierarchy));
+
+            if (idx % 2) tr.classList.add('drillDowner_even');
+
+            const cell = tr.insertCell();
+            const icon = !isLeaf ?
+                `<span class="drillDowner_drill_icon drillDowner_drill_collapsed" data-rowid="${tr.id}" data-level="${currentLevel}"></span>` : '';
+
+            cell.innerHTML = `<span class="drillDowner_indent_${currentLevel}">${icon}${label}</span>`;
+            this._appendDataCells(tr, rowData, null, isLeaf);
+
+            lastInsertedRow = tr;
+        });
+
+        // Toggle parent icon to expanded state
+        const icon = parentRow.querySelector('.drillDowner_drill_icon');
+        if (icon) {
+            icon.classList.remove('drillDowner_drill_collapsed');
+            icon.classList.add('drillDowner_drill_expanded');
+        }
+    }
+
+    /* endregion: mode remote/fetch ________________________________________________________________________________ */
+
 }

@@ -1,0 +1,169 @@
+Task: Add mode: local as is, fetch where the server returns the data for
+- all rows at requested level, totals
+- all rows when a given row is expanded 1 level down
+This is step 1 plan and make the method that returns the json to send to the server an action parameter and all necesary data at least:
+level, current groping , if expanding a row at what level is the row clicked and its displayName or label, what the user sees.
+- also show what data-xxx you plan to add to the table's tr, if any.
+Rule: the displayName is by what we group is the real "dimension" or grouping.
+Rule: if you add data-x it must be orthogonal also in local mode
+Any questions ask
+
+--
+{
+  "action": "change_grouping",
+  "payload": {
+    "groupOrder": ["brand", "product"],
+    "level": 0,
+    "targetDimension": "brand",
+    "requestedTotals": ["price", "quantity"],
+    "requestedColumns": ["info"],
+    "isLedger": false
+  }
+}
+{
+  "action": "expandToLevel",
+  "groupOrder": ["category", "brand", "product"],
+  "requestedTotals": ["price", "quantity"],
+  "requestedColumns": ["info"],
+  "requestDetails": {
+    "level": 2,
+    "expandingLevel": 2,
+    "groupingDimension": "product",
+    "displayName": null,
+    "hierarchyPath": [],
+    "rowId": null
+  }
+}
+
+
+
+
+--_________________________________________________________________
+// Inside _renderGroupingSelect change listener:
+const val = e.target.value;
+const isLedger = val.startsWith('__LEDGER_');
+
+/**
+ * Generates the payload for server-side requests.
+ * @param {string} action - 'expand' or 'expandToLevel'
+ * @param {HTMLElement|null} target - The TR element (for expand) or Control (for expandToLevel)
+ * @returns {Object}
+ */
+_getRequestPayload(action, target = null) {
+    const payload = {
+        action: action,
+        groupOrder: this.options.groupOrder,
+        requestedTotals: this.options.totals,
+        requestedColumns: this.options.columns,
+        requestDetails: {
+            level: -1,
+            expandingLevel: 0,
+            groupingDimension: null,
+            displayNames: [], // Array of raw hierarchy values
+            rowId: null
+        }
+    };
+
+    if (action === 'expand' && target) {
+        const row = target.closest('tr');
+        const level = parseInt(row.getAttribute('data-level'));
+
+        payload.requestDetails = {
+            level: level,
+            expandingLevel: level + 1,
+            groupingDimension: row.getAttribute('data-dimension'),
+            // Retrieves the complete hierarchy of raw values as an array
+            displayNames: this._getHierarchyForRow(row),
+            rowId: row.id
+        };
+    }
+    else if (action === 'expandToLevel') {
+        // For dimension controls, we target a specific depth in the existing groupOrder
+        const level = target ? parseInt(target.dataset.level || target.value) : 0;
+
+        payload.requestDetails = {
+            level: level,
+            expandingLevel: level,
+            groupingDimension: this.options.groupOrder[level],
+            displayNames: [], // Root level expansion starts empty
+            rowId: null
+        };
+    }
+
+    return payload;
+}
+--
+data-level: (Existing) Indicates the depth (0, 1, 2...). Essential for the server to know which index of groupOrder to process next.
+
+data-display-name: (New) Stores the raw value of the grouping key (e.g., "Electronics"). This is critical because the innerText might be modified by formatters or icons, making it unreliable for database queries.
+
+data-dimension: (New) Stores the column name for the current level (e.g., "category"). This maps the row to the groupOrder array.
+
+________________________________________________
+Server respons
+The Generic Server Response Shape
+{
+  "success": true,
+  "error_message": "",
+  "data": {
+    "action": "expand",
+    "level": 1,
+    "groupingDimension": "brand",
+    "displayNames": ["Electronics", "Apple"],
+    "rows": [],
+    "grandTotals": {},
+
+  }
+}
+Scenario A: expand (Drilling into a row)
+
+When a user clicks a drill icon, the server returns only the immediate children.
+{
+  "success": true,
+  "error_message": "",
+  "data": {
+    "action": "expand",
+    "parentRowId": "drillDowner_abc_row_Electronics",
+    "rows": [
+      {
+        "brand": "Apple",
+        "price": 1599.98,
+        "quantity": 25,
+        "info": "Various models"
+      },
+      {
+        "brand": "Samsung",
+        "price": 1399.98,
+        "quantity": 35,
+        "info": "Galaxy series"
+      }
+    ],
+
+  }
+}
+Scenario B: expandToLevel (Breadcrumbs or Dimension Change)
+{
+  "success": true,
+  "error_message": "",
+  "data": {
+    "action": "expandToLevel",
+    "level": 0,
+    "rows": [
+      { "category": "Electronics", "price": 2999.96, "quantity": 60 },
+      { "category": "Books", "price": 70.96, "quantity": 90 }
+    ],
+    "grandTotals": {
+      "price": 3070.92,
+      "quantity": 150
+    },
+
+  }
+}
+Error
+{
+  "success": false,
+  "error_message": "You do not have permission to view financial totals for this category.",
+  "data": null
+}
+
+
