@@ -1,3 +1,22 @@
+Doc dimension renderers
+// leaf wins globally
+leafRenderer: (item, level, dimension, groupOrder, options) =>
+    `<a href="ficha.php?id=${item.id}">${item[dimension]}</a>`,
+
+// per-dimension, used when leafRenderer is absent
+colProperties: {
+    category: {
+        renderer: (item, level, dimension, groupOrder, options) =>
+            `📁 <b>${item.category}</b>`
+    }
+}
+--
+
+DrillDowner.js is a JavaScript class that renders interactive, hierarchical (drill-down) or flat ledger-style data tables from an array of objects. It supports grouping by multiple columns, collapsible rows, grand totals, custom renderers, and optional A–Z navigation. Users can switch grouping dimensions via controls and respond to label clicks.
+
+--
+
+
     QUnit.module('DrillDowner Fetch Mode: Real _getRequestPayload', function() {
 
         const container = '#test-container';

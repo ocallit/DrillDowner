@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DrillDowner QUnit 1.1.14</title>
+    <title>DrillDowner QUnit 1.2.0</title>
 
     <!-- QUnit CSS and JS -->
     <link rel="stylesheet" href="../tools/qunit-2.24.1.css">
@@ -189,12 +189,13 @@
     });
 
     QUnit.module('DrillDowner Table Rendering', function() {
+
         QUnit.test('Table structure is correct', function(assert) {
             const container = '#test-container';
             document.querySelector(container).innerHTML = '';
 
             const drillDowner = new DrillDowner(container, testData, {
-                groupOrder: ["p", "c"],
+                groupOrder: ["p", "c", "w"],
                 columns: ["status"],
                 totals: ["rolls"],
                 colProperties: testColProperties
@@ -215,14 +216,12 @@
             drillDowner.destroy();
         });
 
-
-
         QUnit.test('Drill icons are present at appropriate levels', function(assert) {
             const container = '#test-container';
             document.querySelector(container).innerHTML = '';
 
             const drillDowner = new DrillDowner(container, testData, {
-                groupOrder: ["p", "c"],
+                groupOrder: ["p", "c", "w"],
                 columns: ["status"],
                 totals: ["rolls"]
             });
@@ -1114,8 +1113,11 @@
             drillDowner.collapseToLevel(3);
             visibleRows = Array.from(document.querySelectorAll(container + ' tbody tr')).filter(row =>
                 window.getComputedStyle(row).display !== 'none').length;
-            assert.equal(visibleRows, 30, 'Level 2 shows all rows');
-            // Test level 3
+            let allLevelRows1 = document.querySelectorAll(container + ' tbody tr').length;
+            assert.equal(visibleRows, allLevelRows1, 'Level 2 shows all rows');
+
+
+                // Test level 3
             drillDowner.collapseToLevel(3);
             visibleRows = Array.from(document.querySelectorAll(container + ' tbody tr')).filter(row => 
                 window.getComputedStyle(row).display !== 'none').length;
@@ -1457,7 +1459,7 @@
 
     QUnit.module('DrillDowner Ledger Mode', function() {
 
-        // 1. UPDATED: Initialization test now uses array syntax
+
         QUnit.test('Ledger Mode: Initialization with array configuration', function(assert) {
             const container = '#test-container';
             const controls = '#test-controls';
@@ -1501,7 +1503,7 @@
             drillDowner.destroy();
         });
 
-        // 2. UPDATED: Switching test uses new value format (__LEDGER_0__)
+
         QUnit.test('Ledger Mode: Switching between Standard and Single Ledger', function(assert) {
             const container = '#test-container';
             const controls = '#test-controls';
@@ -1558,7 +1560,7 @@
             drillDowner.destroy();
         });
 
-        // 3. NEW TEST: Grouping enabled + Multiple Ledger Reports
+
         QUnit.test('Ledger Mode: Multiple Ledgers with Grouping available', function(assert) {
             const container = '#test-container';
             const controls = '#test-controls';
@@ -1615,7 +1617,7 @@
             drillDowner.destroy();
         });
 
-        // 4. NEW TEST: No Grouping (Pure Flat Mode) + Multiple Ledger Reports
+
         QUnit.test('Ledger Mode: Multiple Ledgers without Grouping', function(assert) {
             const container = '#test-container';
             const controls = '#test-controls';
@@ -1659,6 +1661,67 @@
             drillDowner.destroy();
         });
 
+        QUnit.test('Ledger Mode: Running balance with initial balance and impact', function(assert) {
+            const container = '#test-container';
+            const data = [
+                { type: 'in', amount: 50 },  // 100 + 50 = 150
+                { type: 'out', amount: 20 }  // 150 - 20 = 130
+            ];
+
+            const dd = new DrillDowner(container, data, {
+                ledger: [{ label: "Test", cols: ['amount'], sort: ['amount'] }],
+                totals: ['balance'],
+                colProperties: {
+                    'balance': {
+                        label: 'Balance',
+                        balanceBehavior: {
+                            initialBalance: 100,
+                            add: ['amount'], // This is a bug-trap: does 'in' vs 'out' logic work?
+                            subtract: []
+                        }
+                    }
+                }
+            });
+
+            const rows = document.querySelectorAll(container + ' tbody tr:not(.drillDowner_initial_row)');
+            const finalBalance = rows[1].querySelector('td.drillDowner_num').textContent;
+
+            assert.equal(finalBalance, '130.00', 'Running balance correctly accounts for initial balance and row impacts');
+            dd.destroy();
+        });
+
+        QUnit.test('Balance Behavior: Cross-column arithmetic and initial balance', function(assert) {
+            const container = '#test-container';
+            const data = [
+                { inc: 100, dec: 20, other: 10 }, // (100 - 20) = +80
+                { inc: 0, dec: 50, other: 5 }     // (0 - 50) = -50
+            ];
+
+            const dd = new DrillDowner(container, data, {
+                groupOrder: [], // Ledger mode
+                ledger: [{ label: "Financials", cols: ['inc', 'dec'], sort: ['inc'] }],
+                totals: ['net'],
+                colProperties: {
+                    'net': {
+                        balanceBehavior: {
+                            initialBalance: 1000,
+                            add: ['inc'],
+                            subtract: ['dec']
+                        }
+                    }
+                }
+            });
+
+            const rows = document.querySelectorAll('tbody tr:not(.drillDowner_initial_row)');
+            const firstRowNet = rows[0].querySelector('td.drillDowner_num').textContent;
+            const secondRowNet = rows[1].querySelector('td.drillDowner_num').textContent;
+
+            assert.equal(firstRowNet, '1,080.00', "Running balance adds and subtracts correctly");
+            assert.equal(secondRowNet, '1,030.00', "Running balance persists correctly to next row");
+            assert.equal(dd.grandTotals.net, 1030, "Grand total matches the final running balance");
+
+            dd.destroy();
+        });
     });
 
     QUnit.test('Persistence: Grouping select is NOT recreated on render', function(assert) {
@@ -1851,6 +1914,91 @@
         });
     });
 
+    Qunit.module("Bug Hunting tests",function(){
+
+        QUnit.test('Hierarchy Corruption: Duplicate labels in different branches', function(assert) {
+            const container = '#test-container';
+            const data = [
+                { folder: "Project A", sub: "Tasks", val: 10 },
+                { folder: "Project B", sub: "Tasks", val: 20 }
+            ];
+
+            const dd = new DrillDowner(container, data, {
+                groupOrder: ["folder", "sub"],
+                totals: ["val"]
+            });
+
+            // Expand Project A -> Tasks
+            const projectARow = Array.from(document.querySelectorAll('tr')).find(tr => tr.textContent.includes('Project A'));
+            projectARow.querySelector('.drillDowner_drill_icon').click();
+
+            // Verify Project B's "Tasks" is still hidden
+            const allTaskRows = Array.from(document.querySelectorAll('tr')).filter(tr => tr.textContent.includes('Tasks'));
+            const visibleTasks = allTaskRows.filter(tr => window.getComputedStyle(tr).display !== 'none');
+
+            assert.equal(visibleTasks.length, 1, "Only the Tasks row for Project A should be visible");
+
+            // Check that the parent/child relationship is maintained by ID, not just label
+            const projectATasks = visibleTasks[0];
+            assert.equal(projectATasks.getAttribute('data-parent'), projectARow.id, "Child row is correctly linked to specific parent ID");
+
+            dd.destroy();
+        });
+
+        QUnit.test('Natural Sort & ID Sanitization: Handling CSS-breaking characters', function(assert) {
+            const container = '#test-container';
+            const data = [
+                { category: "1.1 Section", val: 1 },
+                { category: "1.10 Section", val: 3 },
+                { category: "1.2 Section", val: 2 },
+                { category: "Special # Characters & More!", val: 4 }
+            ];
+
+            const dd = new DrillDowner(container, data, {
+                groupOrder: ["category"],
+                azBarSelector: '#test-azbar'
+            });
+
+            const rows = document.querySelectorAll('tbody tr[data-level="0"]');
+            const labels = Array.from(rows).map(r => r.textContent.trim());
+
+            // Test Natural Sort: 1.2 should come before 1.10
+            assert.deepEqual(labels.slice(0, 3), ["1.1 Section", "1.2 Section", "1.10 Section"], "Natural sort handles version-style numbering");
+
+            // Test ID Sanitization: Check if the special char row has a valid, clickable ID
+            const specialRow = Array.from(rows).find(r => r.textContent.includes('Special'));
+            assert.ok(!specialRow.id.includes('#') && !specialRow.id.includes('&'), "Row ID was sanitized to remove illegal CSS characters");
+
+            dd.destroy();
+        });
+
+        QUnit.test('Calculations: Floating point precision and toxic data', function(assert) {
+            const container = '#test-container';
+            const data = [
+                { val: 0.1 },
+                { val: 0.2 },                  // Sum is 0.30000000000000004
+                { val: NaN },                  // Should be treated as 0
+                { val: Infinity },             // Should be handled by Number() check
+                { wrongKey: 100 }              // Missing 'val' key
+            ];
+
+            const dd = new DrillDowner(container, data, {
+                groupOrder: ["val"],
+                totals: ["val"],
+                colProperties: { val: { decimals: 2 } }
+            });
+
+            // Check Grand Total
+            // 0.1 + 0.2 + 0 + 0 + 0 = 0.3
+            const footerTotal = document.querySelector('tfoot td.drillDowner_num').textContent.trim();
+
+            assert.equal(footerTotal, "0.30", "Handles floating point precision and treats NaN/Missing keys as 0");
+            assert.ok(dd.grandTotals.val < Infinity, "Infinity values did not corrupt the numeric sum");
+
+            dd.destroy();
+        });
+
+    });
 
 
 

@@ -119,9 +119,8 @@
         // Initialize DrillDowner
         document.addEventListener('DOMContentLoaded', function() {
             const drillDowner = new DrillDowner('#table-container', sampleData, {
-                groupOrder: ["category", "brand","product",],
-                columns: ["item","info"],
-                // HELP how do we specify item goes in the "Dimesion" column when it is a leaf row (level > groupOrder.lenght) with no drill down icon when grouping is ["category","brand","product"]
+                groupOrder: ["category", "brand","product","item",],
+                columns: ["info"],
                 totals: ["price","quantity"],
                 colProperties: colProperties,
                 onLabelClick: function(event) {
