@@ -1,6 +1,6 @@
 /* jshint esversion:11 */
 class DrillDowner {
-    static version = '1.2.0';
+    static version = '1.2.1';
 
     constructor(container, dataArr, options = {}) {
         this.container = typeof container === 'string' ? document.querySelector(container) : container;
@@ -353,9 +353,12 @@ class DrillDowner {
     _renderTable() {
         this.container.innerHTML = '';
         const groupCols = this.options.groupOrder.length > 0 ? ["Item"] : ["#"];
-        const totalHeaders = this.options.totals.map(c => this._getColHeader(c));
-        const columnHeaders = this.options.columns.map(c => this._getColHeader(c));
-        const allHeaders = [...groupCols, ...totalHeaders, ...columnHeaders];
+        const activeLed = (this.options.groupOrder.length === 0 && this.activeLedgerIndex >= 0)
+            ? this.options.ledger[this.activeLedgerIndex] : null;
+        const orderedCols = activeLed?.cols
+            ? [...activeLed.cols, ...this.options.totals.filter(c => !activeLed.cols.includes(c))]
+            : [...this.options.totals, ...this.options.columns];
+        const allHeaders = [...groupCols, ...orderedCols.map(c => this._getColHeader(c))];
 
         const table = document.createElement('table');
         table.className = 'drillDowner_table';
@@ -363,14 +366,19 @@ class DrillDowner {
         const hr = thead.insertRow();
         allHeaders.forEach((h, i) => {
             const th = document.createElement('th');
-            if(i > 0 && i <= this.options.totals.length) {
-                const col = this.options.totals[i - 1];
-                th.className = this._getColLabelClass(col) + (this.options.showGrandTotals ? " drillDownerThTotal" : "");
-                th.innerHTML = this.options.showGrandTotals ? `${h}<br><small>${this._formatGrandTotal(col)}</small>` : h;
-            } else if(i > this.options.totals.length) {
-                th.className = this._getColLabelClass(this.options.columns[i - this.options.totals.length - 1]);
+            if(i === 0) {
                 th.textContent = h;
-            } else th.textContent = h;
+            } else {
+                const col = orderedCols[i - 1];
+                const isTotal = this.options.totals.includes(col);
+                if(isTotal) {
+                    th.className = this._getColLabelClass(col) + (this.options.showGrandTotals ? " drillDownerThTotal" : "");
+                    th.innerHTML = this.options.showGrandTotals ? `${h}<br><small>${this._formatGrandTotal(col)}</small>` : h;
+                } else {
+                    th.className = this._getColLabelClass(col);
+                    th.textContent = h;
+                }
+            }
             hr.appendChild(th);
         });
 
@@ -425,31 +433,29 @@ class DrillDowner {
 
                 tr.insertCell().innerHTML = ''; // Indent cell
 
-                // Totals columns (Fill only those with Initial Balance)
-                this.options.totals.forEach(col => {
-                    const td = tr.insertCell();
-                    td.className = 'drillDowner_num';
-                    const props = this._getColProperty(col, 'balanceBehavior');
-                    if(props && typeof props.initialBalance === 'number') {
-                        const dec = this._getColDecimals(col);
-                        const fmt = this._getColFormatter(col);
-                        const val = props.initialBalance;
-                        td.innerHTML = fmt ? fmt(val, {}) : DrillDowner.formatNumber(val, dec);
-                    } else {
-                        td.innerHTML = '';
-                    }
-                });
-
-                // Regular columns (Label "Initial Balance" in first available)
                 let labelSet = false;
-                this.options.columns.forEach(col => {
+                led.cols.forEach(col => {
                     const td = tr.insertCell();
-                    td.className = this._getColClass(col);
-                    if(!labelSet) {
-                        td.innerHTML = 'Initial Balance';
-                        labelSet = true;
+                    const isTotal = this.options.totals.includes(col);
+                    if(isTotal) {
+                        td.className = 'drillDowner_num';
+                        const props = this._getColProperty(col, 'balanceBehavior');
+                        if(props && typeof props.initialBalance === 'number') {
+                            const dec = this._getColDecimals(col);
+                            const fmt = this._getColFormatter(col);
+                            const val = props.initialBalance;
+                            td.innerHTML = fmt ? fmt(val, {}) : DrillDowner.formatNumber(val, dec);
+                        } else {
+                            td.innerHTML = '';
+                        }
                     } else {
-                        td.innerHTML = '';
+                        td.className = this._getColClass(col);
+                        if(!labelSet) {
+                            td.innerHTML = 'Initial Balance';
+                            labelSet = true;
+                        } else {
+                            td.innerHTML = '';
+                        }
                     }
                 });
             };
@@ -462,7 +468,7 @@ class DrillDowner {
                 if(idx % 2) tr.className = 'drillDowner_even';
                 tr.insertCell().innerHTML = `<span class="drillDowner_indent_0">${idx + 1}</span>`;
                 const rowOverrides = balanceMap.get(item) || {};
-                this._appendDataCells(tr, item, null, true, rowOverrides);
+                this._appendDataCells(tr, item, null, true, rowOverrides, 0, led.cols);
             });
 
             // IF DESCENDING: Render Bottom (Just above Footer)
@@ -482,10 +488,12 @@ class DrillDowner {
                 if(i === 0) {
                     td.innerHTML = '<b>Total</b>';
                     td.className = "drillDowner_right";
-                } else if(i <= this.options.totals.length) {
-                    const col = this.options.totals[i - 1];
-                    td.className = "drillDowner_num drillDownerTfootTotal " + this._getColLabelClass(col);
-                    td.innerHTML = this._formatGrandTotal(col);
+                } else {
+                    const col = orderedCols[i - 1];
+                    if(this.options.totals.includes(col)) {
+                        td.className = "drillDowner_num drillDownerTfootTotal " + this._getColLabelClass(col);
+                        td.innerHTML = this._formatGrandTotal(col);
+                    }
                 }
             });
         }
@@ -716,7 +724,46 @@ class DrillDowner {
     }
 
 
-    _appendDataCells(tr, item, gData, isLeaf, overrides = {}, level = 0) {
+    _appendDataCells(tr, item, gData, isLeaf, overrides = {}, level = 0, ledgerCols = null) {
+        if(ledgerCols) {
+            // Ledger mode: render columns in the exact order specified by led.cols
+            ledgerCols.forEach(col => {
+                const td = tr.insertCell();
+                const isTotal = this.options.totals.includes(col);
+                if(isTotal) {
+                    td.className = 'drillDowner_num';
+                    try {
+                        const dec = this._getColDecimals(col);
+                        const fmt = this._getColFormatter(col);
+                        let val;
+                        if(overrides && overrides.hasOwnProperty(col)) {
+                            val = overrides[col];
+                        } else if(this._getColProperty(col, 'balanceBehavior')) {
+                            val = this._calculateRowImpact(item, col);
+                        } else {
+                            val = item[col];
+                        }
+                        td.innerHTML = fmt ? fmt(val, item) : DrillDowner.formatNumber(val, dec);
+                    } catch(err) {
+                        console.error(`DrillDowner: Error rendering total cell [${col}]`, err, item);
+                        td.innerHTML = '<span style="color:red" title="Render Error">⚠️</span>';
+                    }
+                } else {
+                    td.className = this._getColClass(col);
+                    try {
+                        const renderer = this.options.colProperties[col]?.renderer ?? null;
+                        if(renderer) { td.innerHTML = renderer(item, level, col, this.options.groupOrder, this.options); return; }
+                        let val = item[col] ?? "";
+                        const fmt = this._getColFormatter(col);
+                        td.innerHTML = fmt ? fmt(val, item) : val;
+                    } catch(er) {
+                        console.error(`DrillDowner._appendDataCells: Error rendering [${col}]`, er, item);
+                        td.innerHTML = '<span style="color:red" title="Render Error">⚠️</span>';
+                    }
+                }
+            });
+            return;
+        }
         this.options.totals.forEach(col => {
             const td = tr.insertCell();
             td.className = 'drillDowner_num';
