@@ -102,6 +102,10 @@ class DrillDowner {
             select.value = targetValue;
         }
 
+        if (typeof this.options.onGroupOrderChange === 'function') {
+            this.options.onGroupOrderChange(newOrder, oldOrder, this);
+        }
+
         select.dispatchEvent(new Event('change'));
         return this;
     }

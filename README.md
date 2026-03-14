@@ -241,6 +241,7 @@ const dd = new DrillDowner(container, dataArr, options)
 
 ---
 
+
 ## Example Gallery
 
 - `examples/Simple_Example.html` — minimal grouped setup with `leafRenderer`.
@@ -253,18 +254,15 @@ const dd = new DrillDowner(container, dataArr, options)
 - **[Class Diagram](docs/class_diagram.md)** — Mermaid class diagram with options and callback signatures
 - **[Examples](examples/)** — runnable HTML demos
 
+## Security & Trust Boundary
+DrillDowner is a presentation-layer UI component designed to render rich, developer-configured HTML (links, badges, styled text) via the `formatter` and `renderer` options.
+
+**By design, DrillDowner uses `.innerHTML` and does not sanitize input data.** It is the host application's responsibility to sanitize any user-generated content *before* passing it into the `dataArr` or returning it from a custom renderer.
+
 ---
 
-## Browser Compatibility
 
-ES6 required. Tested in:
-
-- Chrome 49+
-- Firefox 45+
-- Safari 10+
-- Edge 13+
-
-Uses `Intl.Collator` (for natural sort with `es-MX` locale) and `Intl.NumberFormat` (`en-US`).
+Uses `Intl.Collator` (for natural accent and case insensitive sort with `es-MX` locale).
 
 ---
 
@@ -285,4 +283,4 @@ MIT — see [LICENSE](LICENSE).
 
 ---
 
-**Made with care by Pepe Santos**
+**Made with care by Raúl José Santos**
