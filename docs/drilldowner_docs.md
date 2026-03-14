@@ -321,27 +321,27 @@ Alternative key name for internal operations.
 
 ### Navigation & Display Control
 
-#### `collapseToLevel(level = 0)`
+#### `showToLevel(level = 0)`
 
 Collapses the table to show only the specified depth level.
 
 - **Parameters:** `level` (number) - Target depth (0 = top level only)
 - **Returns:** `this` (for method chaining)
-- **Example:** `drillDowner.collapseToLevel(1)` shows first two levels
+- **Example:** `drillDowner.showToLevel(1)` shows first two levels
 
 #### `collapseAll()`
 
 Collapses table to show only top-level groups.
 
 - **Returns:** `this`
-- **Shorthand for:** `collapseToLevel(0)`
+- **Shorthand for:** `showToLevel(0)`
 
 #### `expandAll()`
 
 Expands table to show all levels.
 
 - **Returns:** `this`
-- **Shorthand for:** `collapseToLevel(maxLevel)`
+- **Shorthand for:** `showToLevel(maxLevel)`
 
 ### Configuration Changes
 
@@ -625,7 +625,7 @@ drillDowner.render();
 
 // Navigate programmatically
 drillDowner.expandAll();
-drillDowner.collapseToLevel(1);
+drillDowner.showToLevel(1);
 
 // Method chaining
 drillDowner

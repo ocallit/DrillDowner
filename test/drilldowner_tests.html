@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DrillDowner QUnit 1.2.0</title>
+    <title>DrillDowner QUnit 1.2.2</title>
 
     <!-- QUnit CSS and JS -->
     <link rel="stylesheet" href="../tools/qunit-2.24.1.css">
@@ -288,7 +288,7 @@
     });
 
     QUnit.module('DrillDowner Collapse/Expand Functionality', function() {
-        QUnit.test('collapseToLevel works correctly', function(assert) {
+        QUnit.test('showToLevel works correctly', function(assert) {
             const container = '#test-container';
             document.querySelector(container).innerHTML = '';
 
@@ -305,7 +305,7 @@
             assert.equal(visibleRows, level0Rows, 'Initially only level 0 rows are visible');
 
             // Expand to level 1
-            drillDowner.collapseToLevel(1);
+            drillDowner.showToLevel(1);
             visibleRows = Array.from(document.querySelectorAll(container + ' tbody tr')).filter(row =>
                 window.getComputedStyle(row).display !== 'none').length;
             level0Rows = document.querySelectorAll(container + ' tr[data-level="0"]').length;
@@ -313,7 +313,7 @@
             assert.equal(visibleRows, level0Rows + level1Rows, 'Level 0 and 1 rows are visible');
 
             // Collapse back to level 0
-            drillDowner.collapseToLevel(0);
+            drillDowner.showToLevel(0);
             visibleRows = Array.from(document.querySelectorAll(container + ' tbody tr')).filter(row =>
                 window.getComputedStyle(row).display !== 'none').length;
             level0Rows = document.querySelectorAll(container + ' tr[data-level="0"]').length;
@@ -723,21 +723,21 @@
             });
 
             // Test negative level
-            drillDowner.collapseToLevel(-1);
+            drillDowner.showToLevel(-1);
             let visibleRows = Array.from(document.querySelectorAll(container + ' tbody tr')).filter(row => 
                 window.getComputedStyle(row).display !== 'none').length;
             let level0Rows = document.querySelectorAll(container + ' tr[data-level="0"]').length;
             assert.equal(visibleRows, level0Rows, 'Negative level defaults to 0');
 
             // Test level beyond available
-            drillDowner.collapseToLevel(10);
+            drillDowner.showToLevel(10);
             const allRows = document.querySelectorAll(container + ' tbody tr').length;
             visibleRows = Array.from(document.querySelectorAll(container + ' tbody tr')).filter(row => 
                 window.getComputedStyle(row).display !== 'none').length;
             assert.equal(visibleRows, allRows, 'Excessive level shows all rows');
 
             // Test null/undefined level
-            drillDowner.collapseToLevel(null);
+            drillDowner.showToLevel(null);
             visibleRows = Array.from(document.querySelectorAll(container + ' tbody tr')).filter(row => 
                 window.getComputedStyle(row).display !== 'none').length;
             level0Rows = document.querySelectorAll(container + ' tr[data-level="0"]').length;
@@ -1085,7 +1085,7 @@
     });
 
     QUnit.module('DrillDowner API Method Tests', function() {
-        QUnit.test('Direct test for collapseToLevel method', function(assert) {
+        QUnit.test('Direct test for showToLevel method', function(assert) {
             const container = '#test-container';
             document.querySelector(container).innerHTML = '';
 
@@ -1096,21 +1096,21 @@
             });
 
             // Test level 0 (default)
-            drillDowner.collapseToLevel(0);
+            drillDowner.showToLevel(0);
             let visibleRows = Array.from(document.querySelectorAll(container + ' tbody tr')).filter(row => 
                 window.getComputedStyle(row).display !== 'none').length;
             let level0Rows = document.querySelectorAll(container + ' tr[data-level="0"]').length;
             assert.equal(visibleRows, level0Rows, 'Level 0 shows only top-level rows');
 
             // Test level 1
-            drillDowner.collapseToLevel(1);
+            drillDowner.showToLevel(1);
             visibleRows = Array.from(document.querySelectorAll(container + ' tbody tr')).filter(row => 
                 window.getComputedStyle(row).display !== 'none').length;
             let level0And1Rows = document.querySelectorAll(container + ' tr[data-level="0"], ' + container + ' tr[data-level="1"]').length;
             assert.equal(visibleRows, level0And1Rows, 'Level 1 shows level 0 and 1 rows');
 
             // Test level 2
-            drillDowner.collapseToLevel(3);
+            drillDowner.showToLevel(3);
             visibleRows = Array.from(document.querySelectorAll(container + ' tbody tr')).filter(row =>
                 window.getComputedStyle(row).display !== 'none').length;
             let allLevelRows1 = document.querySelectorAll(container + ' tbody tr').length;
@@ -1118,7 +1118,7 @@
 
 
                 // Test level 3
-            drillDowner.collapseToLevel(3);
+            drillDowner.showToLevel(3);
             visibleRows = Array.from(document.querySelectorAll(container + ' tbody tr')).filter(row => 
                 window.getComputedStyle(row).display !== 'none').length;
             let allLevelRows = document.querySelectorAll(container + ' tbody tr').length;
@@ -1248,7 +1248,7 @@
             // Test if methods return 'this' for chaining
             // If they don't, this will throw an error
             try {
-                const result = drillDowner.collapseAll().expandAll().collapseToLevel(1);
+                const result = drillDowner.collapseAll().expandAll().showToLevel(1);
                 assert.equal(result, drillDowner, 'Methods return this for chaining');
                 assert.ok(true, 'Method chaining works');
             } catch (e) {
@@ -1914,7 +1914,7 @@
         });
     });
 
-    Qunit.module("Bug Hunting tests",function(){
+    QUnit.module("Bug Hunting tests",function(){
 
         QUnit.test('Hierarchy Corruption: Duplicate labels in different branches', function(assert) {
             const container = '#test-container';

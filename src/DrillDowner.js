@@ -1,12 +1,13 @@
 /* jshint esversion:11 */
 class DrillDowner {
-    static version = '1.2.1';
+    static version = '1.2.2';
 
     constructor(container, dataArr, options = {}) {
         this.container = typeof container === 'string' ? document.querySelector(container) : container;
         this.dataArr = dataArr;
 
         this.options = Object.assign({
+            remoteUrl: null,
             columns: [],
             totals: [],
             colProperties: {},
@@ -105,13 +106,18 @@ class DrillDowner {
         return this;
     }
 
-    collapseToLevel(level = 0) {
+    showToLevel(level = 0) {
         if(!this.container) return this;
         if(!this.options.groupOrder || this.options.groupOrder.length === 0) return this;
 
         if(isNaN(level) || level == null || level < 0) level = 0;
         const maxLevel = this.options.groupOrder.length;
         if(level > maxLevel) level = maxLevel;
+
+        if(this.options.remoteUrl) {
+            this._remoteRequest('expandToLevel', level);
+            return this;
+        }
 
         const table = this.container.querySelector('table.drillDowner_table');
         if(!table) return this;
@@ -134,11 +140,19 @@ class DrillDowner {
     }
 
     collapseAll() {
-        return this.collapseToLevel(0);
+        if(this.options.remoteUrl) {
+            this._remoteRequest('expandToLevel', 0);
+            return this;
+        }
+        return this.showToLevel(0);
     }
 
     expandAll() {
-        return this.collapseToLevel(this.options.groupOrder.length);
+        if(this.options.remoteUrl) {
+            this._remoteRequest('expandToLevel', this.options.groupOrder.length);
+            return this;
+        }
+        return this.showToLevel(this.options.groupOrder.length);
     }
 
     // Label click
@@ -220,7 +234,6 @@ class DrillDowner {
         if(this.options.groupOrder.length === 0 && this.activeLedgerIndex >= 0 && this.options.ledger[this.activeLedgerIndex]) {
             const activeLedger = this.options.ledger[this.activeLedgerIndex];
             if(activeLedger.cols) {
-                // Filter out totals to avoid duplicate undefined text columns
                 this.options.columns = activeLedger.cols.filter(c => !this.options.totals.includes(c));
             }
         }
@@ -229,10 +242,15 @@ class DrillDowner {
 
         this._renderControls();
         this._renderAZBar();
-        this._renderTable();
 
+        if(this.options.remoteUrl && !this._isFilling) {
+            this._remoteRequest('change_grouping');
+            return;
+        }
+
+        this._renderTable();
         if(this.options.groupOrder.length > 0) {
-            this.collapseToLevel(0);
+            this.showToLevel(0);
         }
     }
 
@@ -328,13 +346,13 @@ class DrillDowner {
 
         nav.querySelectorAll('.drillDowner_breadcrumb_item').forEach(btn => {
             if(btn.dataset.level !== undefined) {
-                btn.onclick = () => this.collapseToLevel(parseInt(btn.dataset.level));
+                btn.onclick = () => this.showToLevel(parseInt(btn.dataset.level));
             }
         });
         nav.querySelectorAll('.drillDowner_breadcrumb_arrow').forEach(btn => {
             btn.onclick = () => {
                 const lvl = parseInt(btn.dataset.arrowLevel);
-                this.collapseToLevel(btn.classList.contains('drillDowner_expanded') ? lvl : lvl + 1);
+                this.showToLevel(btn.classList.contains('drillDowner_expanded') ? lvl : lvl + 1);
             };
         });
     }
@@ -779,7 +797,7 @@ class DrillDowner {
                         if(this._getColProperty(col, 'balanceBehavior')) {
                             val = gData.reduce((s, r) => s + this._calculateRowImpact(r, col), 0);
                         } else {
-                            val = gData.reduce((s, r) => s + (Number(r[col]) || 0), 0);
+                            val = gData.reduce((s, r) => { const v = Number(r[col]); return s + (isFinite(v) ? v : 0); }, 0);
                         }
                         td.innerHTML = fmt ? fmt(val, item) : DrillDowner.formatNumber(val, dec);
                     } else {
@@ -788,7 +806,7 @@ class DrillDowner {
                             const v = this._getColProperty(col, 'balanceBehavior')
                                 ? this._calculateRowImpact(r, col)
                                 : Number(r[col]);
-                            sub[r[subBy]] = (sub[r[subBy]] || 0) + v;
+                            sub[r[subBy]] = (sub[r[subBy]] || 0) + isFinite(v) ? v : 0;
                         });
                         const val = Object.entries(sub).map(([s, v]) => `${DrillDowner.formatNumber(v, dec)} ${s}`).join(', ') || '-';
                         td.innerHTML = fmt ? fmt(val, item) : val;
@@ -891,6 +909,12 @@ class DrillDowner {
         const icon = e.target;
         const rowId = icon.dataset.rowid;
         const expanded = icon.classList.contains('drillDowner_drill_expanded');
+
+        if(this.options.remoteUrl && !expanded) {
+            this._remoteRequest('expand', icon);
+            return;
+        }
+
         icon.classList.toggle('drillDowner_drill_expanded', !expanded);
         icon.classList.toggle('drillDowner_drill_collapsed', expanded);
 
@@ -955,7 +979,7 @@ class DrillDowner {
                     const startBal = (typeof props.initialBalance === 'number') ? props.initialBalance : 0;
                     t[c] = this.dataArr.reduce((s, r) => s + this._calculateRowImpact(r, c), startBal);
                 } else {
-                    t[c] = this.dataArr.reduce((s, r) => s + (Number(r[c]) || 0), 0);
+                    t[c] = this.dataArr.reduce((s, r) => { const v = Number(r[c]); return s + (isFinite(v) ? v : 0); }, 0);
                 }
             } else {
                 const res = {};
@@ -1097,13 +1121,13 @@ class DrillDowner {
         if(action === 'expand' && target) {
             const row = target.closest('tr');
             const level = parseInt(row.getAttribute('data-level') || 0);
-            payload.data = {
+            Object.assign(payload.data, {                              // ← was payload.data =
                 level: level,
                 expandingLevel: level + 1,
                 groupingDimension: row.getAttribute('data-dimension'),
-                displayNames: this._getHierarchyForRow(row),
+                displayNames: JSON.parse(row.getAttribute('data-hierarchy') || '[]'), // ← raw values
                 rowId: row.id
-            };
+            });
         } else if(action === 'expandToLevel') {
             // Safe check for target and its dataset
             let targetLevel = 0;
@@ -1124,37 +1148,46 @@ class DrillDowner {
         return payload;
     }
 
+    _remoteRequest(action, target = null) {
+        const payload = this._getRequestPayload(action, target);
+        fetch(this.options.remoteUrl, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        })
+            .then(r => r.json())
+            .then(json => this._fill(json));
+    }
+
     /**
      * Processes the server response and updates the DOM.
      * @param {Object} json - The JSON response from the server.
      */
     _fill(json) {
-        // 1. Handle Business/Logic Errors (Status 200 but success: false)
         if(!json.success) {
             alert(json.error_message || "A server error occurred.");
             return;
         }
 
         const {data} = json;
-        const {action, rows, level, displayNames, grandTotals} = data;
+        const {action, rows, level, rowId, grandTotals} = data;
 
-        // 2. Update Grand Totals if provided (usually for expandToLevel/change_grouping)
         if(grandTotals) {
             this.grandTotals = grandTotals;
         }
 
         if(action === 'expand') {
-            // Find the specific parent row to inject children under
-            const parentRow = this._findRowByHierarchy(displayNames);
+            const parentRow = document.getElementById(rowId);
             if(!parentRow) return;
-
             this._injectChildRows(parentRow, rows, level);
         } else if(action === 'expandToLevel' || action === 'change_grouping') {
-            // Complete table refresh for the new level/dimension
-            this.dataArr = rows; // Update local reference with the level's data
-            this.render();
-
-            // Ensure breadcrumbs reflect the target level
+            this.dataArr = rows;
+            this._isFilling = true;
+            try {
+                this.render();
+            } finally {
+                this._isFilling = false;
+            }
             this._updateBreadcrumbVisuals(level);
         }
     }
@@ -1165,49 +1198,28 @@ class DrillDowner {
     _injectChildRows(parentRow, rows, parentLevel) {
         const tbody = this.table.tBodies[0];
         let lastInsertedRow = parentRow;
-
-        const parentHierarchy = JSON.parse(
-            parentRow.getAttribute('data-hierarchy') || "[]"
-        );
+        const parentHierarchy = JSON.parse(parentRow.getAttribute('data-hierarchy') || '[]');
+        const currentLevel = parentLevel + 1;
+        const dimensionKey = this.options.groupOrder[currentLevel];
 
         rows.forEach((rowData, idx) => {
-            const currentLevel = parentLevel + 1;
-            const isLeaf = currentLevel >= this.options.groupOrder.length;
+            const rowId = this.options.idPrefix + 'row_fetch_' + (this._idCounter++);
+            const groupKey = rowData[dimensionKey];
 
-            const dimensionKey = isLeaf
-                ? this.options.groupOrder[parentLevel]
-                : this.options.groupOrder[currentLevel];
-
-            const label = rowData[dimensionKey];
-            const rowId = this.options.idPrefix + "row_fetch_" + (this._idCounter++);
-            const currentHierarchy = [...parentHierarchy, label];
-
-            const tr = this._buildRow({
-                tbody: tbody,
+            lastInsertedRow = this._buildRow({
+                tbody,
                 insertAfterRow: lastInsertedRow,
-
-                rowId: rowId,
+                rowId,
                 level: currentLevel,
-                dimension: dimensionKey,
-                hierarchy: currentHierarchy,
+                hierarchy: [...parentHierarchy, groupKey],
                 parentRowId: parentRow.id,
-
-                label: label,
-                labelHtml: String(label),
-                anchorHtml: " ",
-
-                showDrillIcon: !isLeaf,
-                childCount: null,
-                isLeaf: isLeaf,
-
+                groupKey,
                 item: rowData,
                 gData: null,
-
+                anchorHtml: ' ',
                 addEvenClass: !!(idx % 2),
                 addFirstGroupClass: false
             });
-
-            lastInsertedRow = tr;
         });
 
         const icon = parentRow.querySelector('.drillDowner_drill_icon');
@@ -1216,6 +1228,9 @@ class DrillDowner {
             icon.classList.add('drillDowner_drill_expanded');
         }
     }
+
+
+
 
     /* endregion: mode remote/fetch ________________________________________________________________________________ */
 

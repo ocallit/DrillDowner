@@ -170,7 +170,7 @@ new DrillDowner(container, dataArr, options)
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `collapseToLevel(level)` | this | Set visible depth |
+| `showToLevel(level)` | this | Set visible depth |
 | `expandAll()` | this | Show all levels |
 | `collapseAll()` | this | Collapse to top level |
 | `changeGroupOrder(newOrder)` | this | Reorder hierarchy |
