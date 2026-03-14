@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DrillDowner - Simple Example</title>
+  <link href="../src/drilldowner.css" rel="stylesheet" type="text/css"/>
+  <script src="../src/DrillDowner.js"></script>
+</head>
+<body>
+<h2>Simple DrillDowner Example</h2>
+<div id="simple-table"></div>
+
+<script>
+  const data = [
+    { department: "Electronics", product: "USB-C Charger", qty: 14, price: 24.99 },
+    { department: "Electronics", product: "Bluetooth Speaker", qty: 8, price: 79.00 },
+    { department: "Books", product: "JavaScript Basics", qty: 22, price: 19.50 },
+    { department: "Books", product: "UI Design Guide", qty: 9, price: 35.00 }
+  ];
+
+  new DrillDowner('#simple-table', data, {
+    groupOrder: ["department", "product"],
+    totals: ["qty", "price"],
+    colProperties: {
+      department: { label: "Department", icon: "🗂️" },
+      product: { label: "Product", icon: "📦" },
+      qty: { label: "Stock", decimals: 0 },
+      price: { label: "Unit Price", formatter: (v) => `$${DrillDowner.formatNumber(v, 2)}` }
+    },
+    leafRenderer: (item) => `${item.product} <small style="color:#666">(${item.qty} units)</small>`
+  });
+</script>
+</body>
+</html>

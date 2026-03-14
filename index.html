@@ -163,6 +163,8 @@
                 status:   { label: "Status", formatter: formatStatus }
             },
 
+            leafRenderer: (item) => `${item.product} <small style="color:#64748b">(${item.rep})</small>`,
+
             showGrandTotals: true
         });
     });

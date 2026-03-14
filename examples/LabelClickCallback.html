@@ -68,7 +68,9 @@
             // Callback triggered by internal DrillDowner logic
             onLabelClick: (ctx) => {
                 openDialog(ctx);
-            }
+            },
+
+            leafRenderer: (item) => `${item.Product} <small style="color:#666">(Qty: ${item.Qty})</small>`
         });
     });
 

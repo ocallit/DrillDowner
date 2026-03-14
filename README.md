@@ -241,6 +241,12 @@ const dd = new DrillDowner(container, dataArr, options)
 
 ---
 
+## Example Gallery
+
+- `examples/Simple_Example.html` — minimal grouped setup with `leafRenderer`.
+- `examples/Medium_Example.html` — grouped + ledger + controls + A–Z bar.
+- `examples/Advanced_Example.html` — running balance, label click callback, and custom leaf labels.
+
 ## Documentation
 
 - **[Full API Reference](docs/drilldowner_docs.md)** — all options, colProperties, methods, CSS classes, and examples

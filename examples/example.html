@@ -163,6 +163,11 @@
                 status:   { label: "Status", formatter: formatStatus }
             },
 
+            // Make leaf rows more informative than a plain product string
+            leafRenderer: (item) => {
+                return `${item.product} <small style="color:#64748b">(${item.rep})</small>`;
+            },
+
             showGrandTotals: true
         });
     });
