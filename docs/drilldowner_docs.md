@@ -1,741 +1,716 @@
-# DrillDowner JavaScript Widget Documentation
+# DrillDowner — API Reference
 
-## Overview
+**Version 1.2.2 · Zero dependencies · ES6 · Vanilla JS**
 
-DrillDowner is a dependency-free ES6 JavaScript class that creates interactive, hierarchical data tables with drill-down functionality. It allows users to explore nested data by expanding and collapsing groups, switch to flat "ledger" views, with support for totals, custom formatting, and navigation controls.
+---
 
-**Current Version:** 1.1.20
+## Mental Model
+
+DrillDowner takes a **flat array of plain objects** and renders them as either an interactive hierarchical table or a flat sorted table, controlled by three arrays in `options`:
+
+| Array | Role |
+|-------|------|
+| `groupOrder` | Columns that form the drill-down hierarchy (outermost first) |
+| `totals` | Numeric columns summed at every group level and in the grand total |
+| `columns` | Non-numeric display columns shown as-is (empty on group rows unless `togglesUp`) |
+
+**Two rendering modes:**
+
+| Mode | When | What renders |
+|------|------|-------------|
+| **Grouped** | `groupOrder` is non-empty | Collapsible hierarchy; subtotals per group |
+| **Ledger** | `groupOrder` is `[]` and `ledger` is defined | Flat sorted table; one row per item |
+
+Both modes share the same dropdown: `ledger` entries appear alongside grouping combinations.
+
+**Column order in the rendered table:**
+- **Grouped mode:** label column → `totals` columns → `columns` columns.
+- **Ledger mode:** columns follow `led.cols`; any `totals` not in `cols` are appended at the end.
+
+---
 
 ## Constructor
 
-### `new DrillDowner(container, dataArr, options = {})`
-
-Creates a new DrillDowner instance and immediately renders it.
-
-**Parameters:**
+```javascript
+const dd = new DrillDowner(container, dataArr, options)
+```
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `container` | string \| DOM | CSS selector or DOM element for the main table container |
-| `dataArr` | Array | Array of data objects to display |
-| `options` | Object | Configuration options (see Options section) |
+| `container` | `string \| Element` | CSS selector or DOM node. The `<table>` is rendered inside it. |
+| `dataArr` | `Array` | Flat array of plain objects sharing the same keys. |
+| `options` | `Object` | Configuration — all keys are optional. |
 
-**Example:**
+Rendering happens immediately. Store the returned instance to call methods later.
 
 ```javascript
-const drillDowner = new DrillDowner('#my-table', data, {
-    groupOrder: ["category", "subcategory"],
-    columns: ["name", "status"],
-    totals: ["amount"],
-    colProperties: { /* column configurations */ }
-});
+// Always store the instance
+const dd = new DrillDowner('#table', data, { groupOrder: ["region", "rep"] });
 ```
-
-**Note:** The constructor automatically calls `render()` after initialization.
 
 ---
 
 ## Options
 
-### Core Configuration
+### `groupOrder` · `string[]` · default `[]`
 
-#### `groupOrder` (Array)
-
-Defines the hierarchical grouping columns in order from top-level to bottom-level.
-
-- **Type:** Array of strings
-- **Default:** `[]`
-- **Example:** `["product", "color", "warehouse"]` creates Product → Color → Warehouse hierarchy
-
-When empty and `ledger` is defined, the widget starts in ledger mode.
-
-#### `columns` (Array)
-
-Specifies which data columns to display as regular table columns (non-totals).
-
-- **Type:** Array of strings
-- **Default:** `[]`
-- **Example:** `["status", "priority", "notes"]`
-
-#### `totals` (Array)
-
-Specifies which numeric columns to sum up and display as totals.
-
-- **Type:** Array of strings
-- **Default:** `[]`
-- **Example:** `["quantity", "price", "weight"]`
-
-#### `colProperties` (Object)
-
-Defines display properties, formatters, and behavior for each column.
-
-- **Type:** Object with column configurations
-- **Default:** `{}`
-- **Structure:** `{ columnName: { property: value, ... } }`
-
-See [Column Properties](#column-properties-colproperties) section for details.
-
-### Ledger Configuration
-
-#### `ledger` (Array)
-
-Defines flat table view configurations. When provided, users can switch between hierarchical grouping and flat ledger views via a dropdown.
-
-- **Type:** Array of objects (or single object, auto-wrapped)
-- **Default:** `[]`
-
-Each ledger object has:
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `label` | string | Display name in dropdown |
-| `cols` | Array | Columns to show in this view |
-| `sort` | Array | Columns to sort by |
-
-**Example:**
+The hierarchy, listed outermost-first. Each entry must be a key present in your data objects.
 
 ```javascript
-ledger: [
-    {
-        label: "Global Inventory (Detailed)",
-        cols: ["category", "brand", "product", "info"],
-        sort: ["category", "product"]
-    },
-    {
-        label: "Brand Overview (Simple)",
-        cols: ["brand", "product", "info"],
-        sort: ["brand", "product"]
-    }
-]
+groupOrder: ["region", "store", "product"]
+// Renders: Region → Store → Product
+// Totals roll up: product → store → region → grand total
 ```
 
-**Behavior:**
-- If `groupOrder` is empty but `ledger` has entries, the widget starts in ledger mode (first ledger selected)
-- Users can switch between grouping combinations and ledger views via the dropdown
-- In ledger mode, `columns` is replaced by the ledger's `cols`
-- Switching back to grouped mode restores the original `columns`
+When empty and `ledger` is also defined, the widget starts in ledger mode.
 
-### Grouping Options
+---
 
-#### `groupOrderCombinations` (Array|null)
+### `totals` · `string[]` · default `[]`
 
-Predefined grouping combinations for the dropdown selector. When provided, only these combinations appear in the dropdown (instead of auto-generated permutations).
+Keys whose values are numbers. Summed at every group level and in the grand total. Non-numeric values are treated as 0.
 
-- **Type:** Array of arrays or null
-- **Default:** `null`
-- **Example:** `[["product", "color"], ["color", "product"], ["warehouse", "product"]]`
-
-#### `balanceBehavior` (Object)
-
-Calculates a running balance or financial impact based on other columns in the row. This is particularly useful in Ledger mode (flat views) to show chronological running totals with an optional initial balance.
-
-- **Default:** `undefined`
-- **Structure:**
-  - `initialBalance` (number, optional): The starting value before any rows are calculated. If provided, DrillDowner will automatically render an "Initial Balance" row at the top (or bottom, if sorting descending).
-  - `add` (Array of strings, optional): Column names whose values should be added to the balance.
-  - `subtract` (Array of strings, optional): Column names whose values should be subtracted from the balance.
-
-**Example:**
 ```javascript
-{
-  current_balance: {
-    label: "Running Balance",
-    decimals: 2,
-    balanceBehavior: {
-      initialBalance: 5000.00,
-      add: ["deposit_amount", "interest"],
-      subtract: ["withdrawal_amount", "fee"]
-    }
+totals: ["qty", "revenue", "cost"]
+```
+
+---
+
+### `columns` · `string[]` · default `[]`
+
+Keys shown as plain display cells — no summing. In grouped mode, group rows show an empty cell for these unless `togglesUp: true` is set in `colProperties`.
+
+```javascript
+columns: ["status", "notes", "sku"]
+```
+
+---
+
+### `colProperties` · `Object` · default `{}`
+
+Per-column display and behaviour configuration. Every sub-key is optional.
+
+```javascript
+colProperties: {
+  revenue: {
+    label:      "Revenue (USD)",  // Header text. Default: capitalised key name.
+    icon:       "💰",             // Shown in breadcrumb nav at this grouping level.
+    decimals:   2,                // Decimal places. Default: 2.
+    class:      "text-right",     // CSS class on every data <td> for this column.
+    labelClass: "col-header",     // CSS class on the <th> header cell.
+    formatter:  (value, item) => `$${DrillDowner.formatNumber(value, 2)}`,
+    renderer:   null,
+    togglesUp:  false,
+    subTotalBy: null,
+    balanceBehavior: null,
   }
 }
 ```
 
-### UI Components
+#### `formatter(value, item) → string`
 
-#### `controlsSelector` (string|null)
+Lightweight formatting hook.
 
-Container for breadcrumb navigation and grouping controls dropdown.
-
-- **Type:** CSS selector string or null
-- **Default:** `null`
-- **Example:** `"#table-controls"`
-
-#### `azBarSelector` (string|null)
-
-Container for A-Z navigation bar (alphabet quick-jump). Only renders when `groupOrder` has at least one level.
-
-- **Type:** CSS selector string or null
-- **Default:** `null`
-- **Example:** `"#alphabet-nav"`
-
-#### `azBarOrientation` (string)
-
-Defines the layout orientation for the A-Z navigation bar.
-
-- **Type:** string ('vertical' | 'horizontal')
-- **Default:** `'vertical'`
-- **Behavior:** Accepts `'vertical'` for a standard side-bar or `'horizontal'` (also accepts `'h'` or `'row'`) to apply the `drillDowner_az_bar_horizontal` class.
-
-### Display Options
-
-#### `showGrandTotals` (boolean)
-
-Controls whether grand totals appear in table headers and footer.
-
-- **Type:** Boolean
-- **Default:** `true`
-- **Example:** `false` to hide grand totals
-
-#### `idPrefix` (string)
-
-Prefix for all DOM element IDs to avoid conflicts.
-
-- **Type:** String
-- **Default:** Auto-generated random string (`'drillDowner' + random + '_'`)
-- **Note:** Usually auto-generated; override only if needed for specific DOM targeting
-
-### Interaction & Events
-
-#### `onLabelClick` (Function)
-
-A callback function triggered when a user clicks on the text label of a group or item row. This is useful for opening context menus, "Cardex" dialogs, or navigating to detailed views based on the hierarchy context.
-
-* **Type**: `Function` | `null`
-* **Default**: `null`
-* **Signature**: `(context) => void`
-
-**The `context` Object:**
-
-| Key | Type | Description |
-| :--- | :--- | :--- |
-| `label` | `string` | The literal text of the clicked label (e.g., "Main WH"). |
-| `level` | `number` | The depth level in the hierarchy (0 = top level). |
-| `column` | `string` | The name of the column from `groupOrder` at this level (e.g., "Warehouse"). |
-| `hierarchyValues` | `Array` | Sequential list of values from the root to the clicked node (e.g. `["Main WH", "Electronics"]`). |
-| `hierarchyMap` | `Object` | Key-value pairs mapping column names to their path values (e.g. `{ Warehouse: "Main WH", Category: "Electronics" }`). |
-| `rowElement` | `DOM` | The native `<tr>` element that was clicked. |
----
-
-## Column Properties (`colProperties`)
-
-Define behavior and appearance for each column.
-
-### Display Properties
-
-#### `label` (string)
-
-Human-readable column header text.
-
-- **Default:** Capitalized column name
-- **Example:** `{ "qty": { label: "Quantity" } }`
-
-#### `class` (string)
-
-CSS class applied to data cells.
-
-- **Default:** `""`
-- **Example:** `{ "price": { class: "currency-cell" } }`
-
-#### `labelClass` (string)
-
-CSS class applied to header cells.
-
-- **Default:** `""`
-- **Example:** `{ "price": { labelClass: "currency-header" } }`
-
-#### `icon` (string)
-
-Icon displayed next to group labels in breadcrumbs.
-
-- **Default:** `""`
-- **Example:** `{ "category": { icon: "📁" } }`
-
-### Numeric Formatting
-
-#### `decimals` (number)
-
-Number of decimal places for numeric formatting.
-
-- **Default:** `2`
-- **Example:** `{ "price": { decimals: 2 } }` → "1,234.56"
-
-### Advanced Behavior
-
-#### `togglesUp` (boolean)
-
-When true, shows aggregated/combined values at group levels (comma-separated unique values from children).
-
-- **Default:** `false`
-- **Example:** `{ "status": { togglesUp: true } }` shows "Active, Pending" for groups containing both statuses
-- colProperties.<col>.togglesUp = true makes that column “bubble up” to group rows, showing the distinct child values as a comma-separated list (instead of leaving the group cell blank).
-
-#### `formatter` (function)
-
-Custom function to format cell values.
-
-- **Default:** `null`
-- **Signature:** `(value, row) => string`
-- **Parameters:**
-  - `value` - The cell value (or aggregated values if `togglesUp` is true)
-  - `row` - The first data row in the group (useful for accessing other columns)
-
-**Example:**
+- For a **`totals`** column in **grouped** mode: `value` is the **summed total for the group**, not the individual row value.
+- For a **`columns`** column: `value` is the raw field value, or the comma-joined distinct values when `togglesUp: true`.
+- `item` is `gData[0]` — the first data object in the group (useful to reference a sibling field).
+- Returns an HTML string.
+- Ignored when `renderer` is also set.
 
 ```javascript
-{
-    status: {
-        formatter: function(value, row) {
-            const statusMap = {
-                pending: "⏳ Pending",
-                active: "🔄 Active",
-                completed: "✅ Completed"
-            };
-            return statusMap[value] || value;
-        }
-    },
-    priority: {
-        formatter: function(value, row) {
-            return "★".repeat(value);
-        }
-    }
+revenue: { formatter: (value, item) => `$${DrillDowner.formatNumber(value, 2)}` }
+status:  { formatter: (value, item) => `<span class="${item.statusCode}">${value}</span>` }
+```
+
+#### `renderer(item, level, dimension, groupOrder, options) → string`
+
+Full cell override. Called for group rows, leaf rows, and ledger rows. Bypasses `formatter` and `togglesUp`.
+
+- `item` is `gData[0]` for group rows, the individual data object for leaf/ledger rows.
+- Returns an HTML string.
+- **Priority:** `renderer` wins over `formatter` when both are set.
+
+```javascript
+product: {
+  renderer: (item, level, dimension, groupOrder, options) => {
+    if (level === groupOrder.length - 1)          // leaf row
+      return `<a href="/products/${item.sku}">${item.productName}</a>`;
+    return `<b>${item[dimension]}</b>`;            // group row
+  }
 }
 ```
 
-#### `subTotalBy` (string)
+#### `togglesUp` · `boolean` · default `false`
 
-Groups totals by another column (for unit-based totals). The resulting total shows separate sums for each unit.
+Only applies to `columns` entries in grouped mode. When `true`, group rows show the distinct values from all their children joined by `", "`. Silently ignored on `totals` columns and when `renderer` is set.
 
-- **Default:** `null`
-- **Example:** `{ "quantity": { subTotalBy: "unit" } }` → "150 Kg, 75 m"
+```javascript
+status: {
+  togglesUp: true,
+  formatter: (value, item) =>
+    value.split(', ').map(s => `<span class="badge">${s}</span>`).join(' ')
+}
+```
 
-#### `key` (string)
+#### `subTotalBy` · `string|null` · default `null`
 
-Alternative key name for internal operations.
+Only applies to `totals` columns. Groups the sum by the values of another field instead of showing one number.
 
-- **Default:** Column name
-- **Example:** `{ "cat": { key: "category" } }`
+```javascript
+qty: { subTotalBy: "unit" }
+// Group row shows: "500 m, 1,000 pcs"  (instead of a meaningless "1,500")
+// grandTotals.qty becomes: { "m": 500, "pcs": 1000 }
+```
+
+#### `balanceBehavior` · `Object|null` · default `null`
+
+Only applies to `totals` columns. Turns the column into a **running balance** computed from other fields. Most useful in ledger mode.
+
+```javascript
+balance: {
+  label:    "Running Balance",
+  decimals: 2,
+  formatter: (v) => `$${DrillDowner.formatNumber(v, 2)}`,
+  balanceBehavior: {
+    initialBalance: 1000.00,   // Optional starting value. Adds an "Initial Balance" row.
+    add:      ["deposit"],     // Fields added to the running total.
+    subtract: ["withdrawal"]   // Fields subtracted from the running total.
+  }
+}
+```
+
+**Two-pass computation:**
+1. Sort chronologically (ascending, ignoring `-` sort prefix). Accumulate balance row-by-row.
+2. Re-sort for display order (respecting `-` prefix for descending). Render with pre-computed balances.
+
+The balance column does **not** read `item[colKey]` from the data. DrillDowner computes it entirely from the `add`/`subtract` fields.
+
+> **Required:** The balance column must be in `totals`, not `columns`.
+
+---
+
+### `ledger` · `LedgerEntry[]` · default `[]`
+
+Defines flat table views. Each entry adds one option to the grouping dropdown. A single object is auto-wrapped in an array.
+
+```javascript
+ledger: [
+  {
+    label: "All Transactions",                       // Dropdown label
+    cols:  ["date", "description", "amount"],        // Column order for this view
+    sort:  ["date"]                                  // Sort keys; prefix "-" for descending
+  },
+  {
+    label: "Newest First",
+    cols:  ["date", "description", "amount"],
+    sort:  ["-date"]
+  }
+]
+```
+
+- `cols` controls column order. Any `totals` not in `cols` are appended at the end.
+- Top-level `columns` is ignored in ledger mode.
+- Set `groupOrder: []` to start in ledger mode (first ledger entry shown on load).
+
+---
+
+### `groupOrderCombinations` · `Array[]|null` · default `null`
+
+Fixed list of grouping combinations for the dropdown instead of auto-generated permutations (capped at 9).
+
+```javascript
+groupOrderCombinations: [
+  ["region", "store"],
+  ["store", "region"],
+  ["region", "product"]
+]
+```
+
+When `null`, DrillDowner auto-generates permutations of `groupOrder`.
+
+---
+
+### `controlsSelector` · `string|Element|null` · default `null`
+
+Container element for the breadcrumb navigation and grouping dropdown. Without this, no controls render.
+
+```javascript
+controlsSelector: "#table-controls"
+```
+
+The dropdown is built **once** and not re-created on subsequent `render()` calls — the user's selection is preserved across data refreshes.
+
+---
+
+### `azBarSelector` · `string|Element|null` · default `null`
+
+Container for the A–Z quick-jump bar. Active letters (present in the first character of the top-level group) render as clickable anchors; the rest are dimmed.
+
+Only rendered when `groupOrder` is non-empty. Cleared automatically when switching to ledger mode.
+
+```javascript
+azBarSelector:    "#az-nav"
+azBarOrientation: "horizontal"   // "vertical" (default) | "horizontal" | "h" | "row"
+```
+
+`"horizontal"` (and aliases `"h"`, `"row"`) adds the CSS class `drillDowner_az_bar_horizontal`.
+
+---
+
+### `showGrandTotals` · `boolean` · default `true`
+
+Shows or hides the grand total sub-values in `<thead>` and the `<tfoot>` row.
+
+---
+
+### `onLabelClick` · `Function|null` · default `null`
+
+Callback fired when a user clicks the text label of a group or leaf row (not the drill icon).
+
+```javascript
+onLabelClick: (ctx) => {
+  ctx.label           // string  — visible text of the clicked row
+  ctx.level           // number  — 0 = outermost group
+  ctx.column          // string  — groupOrder key at this level
+  ctx.isLeaf          // boolean — true when level > groupOrder.length - 1
+  ctx.hierarchyValues // Array   — ["West", "Alice"] root-to-node path
+  ctx.hierarchyMap    // Object  — { region: "West", rep: "Alice" }
+  ctx.groupOrder      // Array   — snapshot of current groupOrder
+  ctx.rowElement      // Element — the <tr> DOM node
+  ctx.options         // Object  — the full options object
+}
+```
+
+---
+
+### `leafRenderer` · `Function|null` · default `null`
+
+Top-level override for leaf-row label cells. Takes priority over `colProperties[dimension].renderer` at the leaf level. Does **not** apply to non-leaf group rows.
+
+```javascript
+// Signature
+leafRenderer: (item, level, dimension, groupOrder, options) => htmlString
+
+// Example
+leafRenderer: (item) => `<a href="/detail/${item.id}">${item.name}</a>`
+```
+
+---
+
+### `remoteUrl` · `string|null` · default `null`
+
+Enables server-side drill-down. When set, drill interactions POST JSON to this URL instead of expanding local data.
+
+**Request sent by DrillDowner:**
+```json
+{
+  "action": "expand | expandToLevel | change_grouping",
+  "data": {
+    "level": 1,
+    "expandingLevel": 2,
+    "groupingDimension": "store",
+    "displayNames": ["West", "Oakland"],
+    "rowId": "drillDowner_abc_row_7",
+    "groupOrder": ["region", "store", "product"],
+    "requestedTotals": ["revenue"],
+    "requestedColumns": ["status"]
+  }
+}
+```
+
+**Response expected from server:**
+```json
+{
+  "success": true,
+  "data": {
+    "action": "expand",
+    "rows": [],
+    "level": 1,
+    "rowId": "drillDowner_abc_row_7",
+    "grandTotals": { "revenue": 125000 }
+  }
+}
+```
+
+On failure: `{ "success": false, "error_message": "..." }` — DrillDowner calls `alert()`.
+
+| `action` sent | When |
+|---------------|------|
+| `"change_grouping"` | Dropdown changes or initial render |
+| `"expandToLevel"` | `showToLevel()`, breadcrumb click |
+| `"expand"` | User clicks a drill icon |
+
+---
+
+### `idPrefix` · `string` · default auto-generated
+
+Prefix for all DOM element IDs. Auto-generated as `"drillDowner" + randomString + "_"`. Override only when you need predictable IDs or are running two instances on the same page.
+
+---
+
+### `onGroupOrderChange` · `Function|null` · default `null`
+
+Defined in the constructor defaults but **never called** by the current code. Do not use.
 
 ---
 
 ## Public Methods
 
-### Navigation & Display Control
+All methods except `render()` and `destroy()` return `this` and are chainable.
 
-#### `showToLevel(level = 0)`
+### `showToLevel(level)` → `this`
 
-Collapses the table to show only the specified depth level.
+Show rows to the given depth; collapse everything deeper.
 
-- **Parameters:** `level` (number) - Target depth (0 = top level only)
-- **Returns:** `this` (for method chaining)
-- **Example:** `drillDowner.showToLevel(1)` shows first two levels
-
-#### `collapseAll()`
-
-Collapses table to show only top-level groups.
-
-- **Returns:** `this`
-- **Shorthand for:** `showToLevel(0)`
-
-#### `expandAll()`
-
-Expands table to show all levels.
-
-- **Returns:** `this`
-- **Shorthand for:** `showToLevel(maxLevel)`
-
-### Configuration Changes
-
-#### `changeGroupOrder(newOrder)`
-
-Changes the grouping hierarchy and re-renders the table.
-
-- **Parameters:** `newOrder` (Array) - New array of column names for grouping
-- **Returns:** `this`
-- **Behavior:**
-  - If controls exist, updates the dropdown selection
-  - If the new order doesn't exist in dropdown, adds it as a custom option
-  - Triggers a change event and re-renders
-
-**Example:**
+- `0` → only outermost group rows
+- `groupOrder.length` → everything visible (same as `expandAll()`)
+- Values out of range are clamped. `NaN` and negatives clamp to `0`.
+- No effect when `groupOrder` is empty.
 
 ```javascript
-drillDowner.changeGroupOrder(["warehouse", "product", "color"]);
+dd.showToLevel(1);
 ```
 
-#### `render()`
+### `collapseAll()` → `this`
 
-Completely re-renders the entire table and controls.
+Shorthand for `showToLevel(0)`.
 
-- **Returns:** `void`
-- **Use case:** After changing data or configuration properties
-- **Note:** Automatically recalculates grand totals
+### `expandAll()` → `this`
 
-**Example:**
+Shorthand for `showToLevel(groupOrder.length)`.
+
+### `changeGroupOrder(newOrder)` → `this`
+
+Changes the active grouping and re-renders.
+
+- With `controlsSelector`: updates the dropdown selection (adds a new option if the combination is not already listed) and fires the `change` event.
+- Without `controlsSelector`: sets `options.groupOrder` directly and calls `render()`.
 
 ```javascript
-drillDowner.dataArr.push(newRecord);
-drillDowner.render();
+dd.changeGroupOrder(["store", "region"]);
 ```
 
-### Utility Methods
+### `render()` → `void`
 
-#### `getTable()`
-
-Returns the native DOM element of the main table.
-
-- **Returns:** DOM element
-- **Example:** `const table = drillDowner.getTable();`
-
-#### `destroy()`
-
-Cleans up event handlers and empties all containers.
-
-- **Returns:** `void`
-- **Use case:** Before removing DrillDowner or creating a new instance
-- **Important:** Always call before destroying the instance to prevent memory leaks
-
-**Example:**
+Full re-render. Recalculates `grandTotals`, rebuilds the table, resets to collapsed state. The dropdown and its current selection are preserved.
 
 ```javascript
-drillDowner.destroy();
+dd.dataArr.push(newRow);
+dd.render();
 ```
 
----
+### `getTable()` → `Element`
 
-## Static Methods
+Returns the `<table>` DOM element.
 
-### `DrillDowner.formatNumber(number, decimals)`
+### `destroy()` → `void`
 
-Formats numbers with thousands separators (uses `en-US` locale).
-
-- **Parameters:**
-  - `number` (number) - Number to format
-  - `decimals` (number) - Decimal places
-- **Returns:** Formatted string (or original value if not a valid number)
-
-**Example:**
+Empties all containers and removes event listeners. Call before re-initialising DrillDowner on the same container.
 
 ```javascript
-DrillDowner.formatNumber(1234.567, 2)  // → "1,234.57"
-DrillDowner.formatNumber(1000000, 0)   // → "1,000,000"
-options:{colProperties:{column_name:{formatter:  DrillDowner.formatNumber}}}
-```
-### `DrillDowner.formatDate(value, includeTime)`
-
-- **Parameters:**
-  - `value` (string | Date) - The date string or JavaScript Date object to format.
-  - `includeTime` (boolean, optional) - If true, appends the time in 24-hour format (HH:mm). Default is false.
-- **Returns:** Formatted string (or original value if it cannot be parsed)
-
-
-**Example:**
-
-```javascript
-options:{colProperties:{column_name:{
-    formatter: (val) => DrillDowner.formatDate(val, true) // For DateTime
-    formatter: DrillDowner.formatDate // For Date only 03/Jan/25
-}}}
-```
-
----
-
-## Static Properties
-
-### `DrillDowner.version`
-
-Current version string.
-
-- **Type:** string
-- **Value:** `'1.1.13'`
-
-**Example:**
-
-```javascript
-console.log(DrillDowner.version);  // "1.1.13"
+dd.destroy();
+const dd2 = new DrillDowner('#table', newData, newOptions);
 ```
 
 ---
 
 ## Public Properties
 
-### Data Properties
-
-#### `dataArr` (Array)
-
-The source data array.
-
-- **Modifiable:** Yes (call `render()` after changes)
-
-#### `grandTotals` (Object)
-
-Calculated grand totals for all total columns. Updated automatically on `render()`.
-
-- **Structure:** `{ columnName: totalValue }` or `{ columnName: { unit: subtotal } }` when using `subTotalBy`
-
-### Configuration Properties
-
-#### `options` (Object)
-
-Current configuration options.
-
-- **Modifiable:** Yes (call `render()` after changes)
-
-#### `totals` (Array)
-
-Reference to `options.totals`.
-
-#### `columns` (Array)
-
-Reference to `options.columns`.
-
-#### `colProperties` (Object)
-
-Reference to `options.colProperties`.
-
-### UI Element References
-
-#### `container` (DOM)
-
-Main table container element.
-
-#### `controls` (DOM|null)
-
-Controls container element (if provided via `controlsSelector`).
-
-#### `azBar` (DOM|null)
-
-A-Z navigation bar element (if provided via `azBarSelector`).
-
-#### `table` (DOM)
-
-The actual table element (available after rendering).
+| Property | Type | Notes |
+|----------|------|-------|
+| `dataArr` | `Array` | Live data array. Mutate then call `render()`. |
+| `grandTotals` | `Object` | `{ col: number }` for plain totals; `{ col: { unit: number } }` for `subTotalBy`; ends-balance for `balanceBehavior`. Updated every `render()`. |
+| `options` | `Object` | Merged options. Writable — modify then call `render()`. |
+| `container` | `Element` | Main container DOM element. |
+| `table` | `Element` | The `<table>` element. Available after construction. |
+| `controls` | `Element\|null` | Controls container, or `null`. |
+| `azBar` | `Element\|null` | A-Z bar container, or `null`. |
 
 ---
 
-## Usage Examples
+## Static Utilities
 
-### Basic Setup
+### `DrillDowner.formatNumber(n, decimals)` → `string`
 
-```javascript
-const data = [
-    {category: "Electronics", product: "Phone", quantity: 10, price: 599.99},
-    {category: "Electronics", product: "Laptop", quantity: 5, price: 1299.99},
-    {category: "Books", product: "Novel", quantity: 25, price: 19.99}
-];
-
-const drillDowner = new DrillDowner('#table-container', data, {
-    groupOrder: ["category", "product"],
-    columns: ["quantity"],
-    totals: ["price"],
-    colProperties: {
-        category: {label: "Category", icon: "📁"},
-        product: {label: "Product Name"},
-        quantity: {label: "Qty", decimals: 0},
-        price: {label: "Price ($)", decimals: 2, class: "money"}
-    }
-});
-```
-
-### With Custom Formatting
+Comma-separated thousands formatting.
 
 ```javascript
-const drillDowner = new DrillDowner('#table', data, {
-    groupOrder: ["department", "employee"],
-    columns: ["status", "priority"],
-    totals: ["hours"],
-    colProperties: {
-        status: {
-            label: "Status",
-            togglesUp: true,
-            formatter: (value) => {
-                const icons = {active: "🟢", inactive: "🔴", pending: "🟡"};
-                return `${icons[value] || "⚫"} ${value}`;
-            }
-        },
-        priority: {
-            label: "Priority",
-            formatter: (value) => "★".repeat(value)
-        },
-        hours: {
-            label: "Work Hours",
-            decimals: 1,
-            subTotalBy: "timeUnit"
-        }
-    },
-    controlsSelector: "#controls",
-    azBarSelector: "#az-nav"
-});
+DrillDowner.formatNumber(1234567.8, 2)  // → "1,234,567.80"
+DrillDowner.formatNumber(1000, 0)        // → "1,000"
+DrillDowner.formatNumber(null, 2)        // → ""
 ```
 
-### With Ledger Mode
+### `DrillDowner.formatDate(value, includeTime)` → `string`
+
+Formats a date as `DD/MMM/YY`, optionally appending `HH:mm`.
+
+- `value`: `Date` object, or string matching `YYYY-MM-DD` or `YYYYMMDD`, optionally with `T HH:MM`.
+- `includeTime`: `boolean`, default `false`. Time is appended only when the input actually contains time components.
+- Returns the original string unchanged if parsing fails.
 
 ```javascript
-const drillDowner = new DrillDowner('#table-container', data, {
-    groupOrder: ["category", "brand", "product"],
-    groupOrderCombinations: [
-        ["category", "brand"],
-        ["brand", "product"]
-    ],
-    columns: ["info"],
-    totals: ["price", "quantity"],
-    
-    // Ledger views for flat table display
-    ledger: [
-        {
-            label: "Global Inventory (Detailed)",
-            cols: ["category", "brand", "product", "info"],
-            sort: ["category", "product"]
-        },
-        {
-            label: "Brand Overview (Simple)",
-            cols: ["brand", "product", "info"],
-            sort: ["brand", "product"]
-        }
-    ],
-    
-    controlsSelector: '#table-controls',
-    azBarSelector: '#az-bar'
-});
+DrillDowner.formatDate("2024-03-15")                  // → "15/Mar/24"
+DrillDowner.formatDate("2024-03-15T09:30:00", true)   // → "15/Mar/24 09:30"
+DrillDowner.formatDate(new Date())                    // → "14/Mar/26"
+
+// Use as a formatter:
+colProperties: {
+  orderDate: { formatter: DrillDowner.formatDate },
+  updatedAt: { formatter: (v) => DrillDowner.formatDate(v, true) }
+}
 ```
 
-### Pure Ledger Mode (No Grouping)
-
-```javascript
-// Start directly in ledger mode with no hierarchical option
-const drillDowner = new DrillDowner('#table-container', data, {
-    groupOrder: [],  // Empty = pure ledger mode
-    ledger: [
-        { label: "By Product", cols: ["product", "info"], sort: ["product"] },
-        { label: "By Color", cols: ["color", "info"], sort: ["color"] }
-    ],
-    totals: ["quantity"],
-    controlsSelector: '#controls'
-});
-```
-
-### Dynamic Updates
-
-```javascript
-// Change grouping
-drillDowner.changeGroupOrder(["employee", "department"]);
-
-// Modify data and refresh
-drillDowner.dataArr.push(newRecord);
-drillDowner.render();
-
-// Navigate programmatically
-drillDowner.expandAll();
-drillDowner.showToLevel(1);
-
-// Method chaining
-drillDowner
-    .changeGroupOrder(["warehouse", "product"])
-    .expandAll();
-
-// Cleanup when done
-drillDowner.destroy();
-```
+### `DrillDowner.version` → `"1.2.2"`
 
 ---
 
-## CSS Classes
-
-The widget generates these CSS classes for styling:
+## CSS Classes Reference
 
 ### Table Structure
 
-| Class | Element | Description |
-|-------|---------|-------------|
-| `.drillDowner_table` | `<table>` | Main table |
-| `.drillDowner_even` | `<tr>` | Alternating row color |
-| `.drillDowner_first_group` | `<tr>` | First row in a group |
-| `.drillDowner_num` | `<td>` | Numeric cells |
-| `.drillDownerThTotal` | `<th>` | Header cells with grand totals |
-| `.drillDownerTfootTotal` | `<td>` | Footer total cells |
+| Class | Applied to | Purpose |
+|-------|-----------|---------|
+| `.drillDowner_table` | `<table>` | Main table element |
+| `.drillDowner_even` | `<tr>` | Alternating row striping |
+| `.drillDowner_first_group` | `<tr>` | First row within each group |
+| `.drillDowner_num` | `<td>` | Numeric / total cells |
+| `.drillDowner_right` | any | Right-aligned text |
+| `.drillDowner_center` | any | Centred text |
 
 ### Drill Icons
 
-| Class | Description |
-|-------|-------------|
-| `.drillDowner_drill_icon` | Expand/collapse icon container |
-| `.drillDowner_drill_collapsed` | Collapsed state (▶) |
-| `.drillDowner_drill_expanded` | Expanded state (▼) |
+| Class | Purpose |
+|-------|---------|
+| `.drillDowner_drill_icon` | Expand / collapse clickable icon |
+| `.drillDowner_drill_expanded` | Icon state: expanded (▼) |
+| `.drillDowner_drill_collapsed` | Icon state: collapsed (▶) |
+| `.drillDowner_child_count` | Item-count badge next to the icon |
 
 ### Indentation
 
-| Class | Padding |
+| Class | Depth |
+|-------|-------|
+| `.drillDowner_indent_0` | Level 0 (outermost) |
+| `.drillDowner_indent_1` | Level 1 |
+| `.drillDowner_indent_2` | Level 2 |
+| `.drillDowner_indent_3` | Level 3 |
+| `.drillDowner_indent_4` | Level 4 |
+| `.drillDowner_indent_5` | Level 5 |
+
+### Grand Totals
+
+| Class | Purpose |
 |-------|---------|
-| `.drillDowner_indent_0` | 0 |
-| `.drillDowner_indent_1` | 2em |
-| `.drillDowner_indent_2` | 3em |
-| `.drillDowner_indent_3` | 4em |
-| `.drillDowner_indent_4` | 5em |
-| `.drillDowner_indent_5` | 6em |
+| `.drillDownerThTotal` | `<th>` cells in the header that show column totals |
+| `.drillDownerTfootTotal` | `<td>` cells in the footer grand total row |
 
 ### Controls
 
-| Class | Description |
-|-------|-------------|
-| `.drillDowner_controls_container` | Controls wrapper |
+| Class | Purpose |
+|-------|---------|
+| `.drillDowner_controls_container` | Outer wrapper for breadcrumbs + dropdown |
 | `.drillDowner_breadcrumb_nav` | Breadcrumb container |
-| `.drillDowner_breadcrumb_item` | Breadcrumb level buttons |
-| `.drillDowner_breadcrumb_arrow` | Arrow between breadcrumbs |
-| `.drillDowner_grouping_controls` | Dropdown container |
-| `.drillDowner_modern_select` | Grouping dropdown |
-| `.drillDowner_control_label` | "Group by:" label |
+| `.drillDowner_breadcrumb_item` | Individual breadcrumb `<button>` |
+| `.drillDowner_breadcrumb_arrow` | Arrow `<button>` between breadcrumb items |
+| `.drillDowner_grouping_controls` | Dropdown wrapper |
+| `.drillDowner_modern_select` | The `<select>` element |
+| `.drillDowner_control_label` | The "Group by:" label |
+| `.drillDowner_initial_row` | The "Initial Balance" row from `balanceBehavior` |
 
-### A-Z Navigation
+### A-Z Bar
 
-| Class | Description |
-|-------|-------------|
-| `.drillDowner_az_bar` | A-Z bar container |
-| `.drillDowner_az_link` | Active letter link |
-| `.drillDowner_az_dimmed` | Inactive letter |
-| `.drillDowner_layout_container` | Flex container for AZ + table |
-
-### Alignment Helpers
-
-| Class | Description |
-|-------|-------------|
-| `.drillDowner_right` | Right-aligned text |
-| `.drillDowner_center` | Center-aligned text |
-
+| Class | Purpose |
+|-------|---------|
+| `.drillDowner_az_bar` | A-Z bar container (always present) |
+| `.drillDowner_az_bar_horizontal` | Added when `azBarOrientation` is horizontal |
+| `.drillDowner_az_link` | `<a>` for letters present in data |
+| `.drillDowner_az_dimmed` | `<span>` for letters not present in data |
 
 ---
 
-## Browser Compatibility
+## Common Mistakes
 
-- **ES6:** Uses modern JavaScript features (classes, arrow functions, template literals, etc.)
-- **Browsers:** Modern browsers supporting ES6:
-  - Chrome 49+
-  - Firefox 45+
-  - Safari 10+
-  - Edge 13+
-- **Intl.Collator:** Uses for natural sorting with `es-MX` locale (well-supported)
-- **Intl.NumberFormat:** Uses for number formatting with `en-US` locale
+**`balanceBehavior` column in `columns` instead of `totals`**
+The balance is only computed for columns in `totals`. In `columns` it just shows the raw data value (typically 0 or absent).
 
----
+**`formatter` receiving raw row value for a grouped total**
+`formatter(value, item)` for a `totals` column in grouped mode receives the **group sum**, not the individual row value.
 
-## Notes
+**`togglesUp` on a `totals` column**
+`togglesUp` only works on `columns` entries. On a `totals` column it is silently ignored.
 
-### Sorting
-
-The widget uses `Intl.Collator` with the following configuration for natural sorting:
-
+**Not storing the instance**
 ```javascript
-new Intl.Collator('es-MX', {
-    sensitivity: 'base',
-    numeric: true,
-    caseFirst: 'false'
-})
+// Wrong — can't call methods later
+new DrillDowner('#table', data, options);
+
+// Correct
+const dd = new DrillDowner('#table', data, options);
 ```
 
-This provides case-insensitive, number-aware sorting appropriate for Spanish text.
+**Re-initialising without `destroy()`**
+Old event listeners remain attached. Always call `dd.destroy()` before creating a new instance on the same container.
 
-### Event Handling
+**Using `onGroupOrderChange`**
+This option is declared in the constructor defaults but is never invoked by the library. Do not rely on it.
 
-The widget cleans up event listeners by cloning elements when re-rendering. Always call `destroy()` before removing the widget to ensure proper cleanup.
+---
 
-### Controls Persistence
+## Examples
 
-The grouping dropdown is NOT recreated on `render()` calls—it persists to maintain user selection state. Only the breadcrumbs and table are refreshed.
+### 1 — Basic drill-down
+
+```html
+<div id="controls"></div>
+<div id="table"></div>
+<script>
+const inventory = [
+  { category: "Electronics", brand: "Apple",   product: "iPhone 15",  qty: 12, price: 999 },
+  { category: "Electronics", brand: "Samsung", product: "Galaxy S24", qty: 20, price: 849 },
+  { category: "Clothing",    brand: "Nike",    product: "Air Max 90", qty: 50, price: 120 },
+];
+
+const dd = new DrillDowner('#table', inventory, {
+  groupOrder: ["category", "brand", "product"],
+  totals:     ["qty", "price"],
+  colProperties: {
+    category: { label: "Category", icon: "📁" },
+    brand:    { label: "Brand" },
+    product:  { label: "Product" },
+    qty:      { label: "In Stock", decimals: 0 },
+    price:    { label: "Unit Price", formatter: (v) => `$${DrillDowner.formatNumber(v, 2)}` }
+  },
+  controlsSelector: "#controls"
+});
+</script>
+```
+
+### 2 — Curated groupings + ledger + A-Z bar
+
+```html
+<div id="controls"></div>
+<div id="az"></div>
+<div id="table"></div>
+<script>
+const dd = new DrillDowner('#table', salesData, {
+  groupOrder: ["region", "rep", "customer"],
+  groupOrderCombinations: [
+    ["region", "rep"],
+    ["rep", "customer"],
+    ["region", "customer"]
+  ],
+  totals:  ["revenue", "units"],
+  columns: ["status"],
+  colProperties: {
+    status: {
+      togglesUp: true,
+      formatter: (v) => v.split(', ')
+        .map(s => ({ active: '<span style="color:green">● Active</span>',
+                     pending: '<span style="color:orange">● Pending</span>' }[s] || s))
+        .join(' ')
+    },
+    revenue: { formatter: (v) => `$${DrillDowner.formatNumber(v, 2)}` }
+  },
+  ledger: [
+    { label: "Transaction Log", cols: ["date", "customer", "rep", "revenue"], sort: ["-date"] }
+  ],
+  controlsSelector: "#controls",
+  azBarSelector:    "#az",
+  azBarOrientation: "horizontal"
+});
+</script>
+```
+
+### 3 — Bank statement (running balance)
+
+```html
+<div id="controls"></div>
+<div id="table"></div>
+<script>
+const transactions = [
+  { date: "2024-01-05", description: "Salary",    deposit: 3000, withdrawal: 0 },
+  { date: "2024-01-08", description: "Rent",      deposit: 0,    withdrawal: 1200 },
+  { date: "2024-02-05", description: "Salary",    deposit: 3000, withdrawal: 0 },
+];
+
+const dd = new DrillDowner('#table', transactions, {
+  groupOrder: [],
+  ledger: [
+    { label: "Chronological", cols: ["date", "description", "deposit", "withdrawal", "balance"], sort: ["date"] },
+    { label: "Newest First",  cols: ["date", "description", "deposit", "withdrawal", "balance"], sort: ["-date"] }
+  ],
+  totals: ["deposit", "withdrawal", "balance"],
+  colProperties: {
+    date:        { formatter: DrillDowner.formatDate },
+    deposit:     { decimals: 2, formatter: (v) => v ? `$${DrillDowner.formatNumber(v, 2)}` : "" },
+    withdrawal:  { decimals: 2, formatter: (v) => v ? `$${DrillDowner.formatNumber(v, 2)}` : "" },
+    balance: {
+      label: "Balance", decimals: 2,
+      formatter: (v) => `$${DrillDowner.formatNumber(v, 2)}`,
+      balanceBehavior: { initialBalance: 1000, add: ["deposit"], subtract: ["withdrawal"] }
+    }
+  },
+  controlsSelector: "#controls"
+});
+</script>
+```
+
+### 4 — Mixed units (`subTotalBy`)
+
+```javascript
+const stock = [
+  { warehouse: "Main", product: "Cable", qty: 500, unit: "m"   },
+  { warehouse: "Main", product: "Bolts", qty: 1000, unit: "pcs" },
+  { warehouse: "East", product: "Cable", qty: 250, unit: "m"   },
+];
+
+const dd = new DrillDowner('#table', stock, {
+  groupOrder: ["warehouse", "product"],
+  totals:     ["qty"],
+  colProperties: {
+    qty: { label: "Quantity", decimals: 0, subTotalBy: "unit" }
+    // "Main" row shows: "500 m, 1,000 pcs"
+  }
+});
+```
+
+### 5 — `onLabelClick` callback
+
+```javascript
+const dd = new DrillDowner('#table', data, {
+  groupOrder: ["department", "employee"],
+  totals: ["hours"],
+  onLabelClick: (ctx) => {
+    if (ctx.isLeaf) {
+      showSidebar(ctx.hierarchyMap);
+    }
+  }
+});
+```
+
+### 6 — Dynamic updates and chaining
+
+```javascript
+// Add data and refresh
+dd.dataArr.push(newRow);
+dd.render();
+
+// Replace all data
+dd.dataArr = await fetch('/api/sales').then(r => r.json());
+dd.render();
+
+// Programmatic navigation
+dd.expandAll();
+dd.showToLevel(1);
+dd.collapseAll();
+
+// Method chaining
+dd.changeGroupOrder(["region", "product"]).showToLevel(1);
+
+// Read computed totals
+console.log(dd.grandTotals.revenue);           // number
+console.log(dd.grandTotals.qty);               // { "m": 750, "pcs": 1000 } with subTotalBy
+
+// Clean up
+dd.destroy();
+```
