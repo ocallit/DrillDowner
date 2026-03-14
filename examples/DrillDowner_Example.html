@@ -128,7 +128,10 @@
                 },
              //   groupOrderCombinations:[["brand","product"],["category","product"],["category","brand","product"]],
                 controlsSelector: '#table-controls',
-                azBarSelector: '#az-bar'
+                azBarSelector: '#az-bar',
+                leafRenderer: function(item) {
+                    return `${item.item} <small style="color:#666">(${item.brand})</small>`;
+                }
             });
             console.log("drillDowner", drillDowner);
         });

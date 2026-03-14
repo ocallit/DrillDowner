@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DrillDowner - Advanced Example</title>
+  <link href="../src/drilldowner.css" rel="stylesheet" type="text/css"/>
+  <script src="../src/DrillDowner.js"></script>
+</head>
+<body>
+<h2>Advanced Example (Running Balance + Click Context + Leaf Renderer)</h2>
+<div id="advanced-controls"></div>
+<div style="display:flex; gap:16px;">
+  <div id="advanced-az"></div>
+  <div id="advanced-table" style="flex:1;"></div>
+</div>
+<pre id="advanced-log" style="background:#f7f7f7; padding:10px; margin-top:10px;">Click any label to inspect context.</pre>
+
+<script>
+  const tx = [
+    { account: "Operating", month: "2024-01", category: "Income", desc: "Invoice 1001", credit: 5200, debit: 0 },
+    { account: "Operating", month: "2024-01", category: "Expense", desc: "Cloud Hosting", credit: 0, debit: 480 },
+    { account: "Operating", month: "2024-02", category: "Income", desc: "Invoice 1008", credit: 4100, debit: 0 },
+    { account: "Savings", month: "2024-02", category: "Income", desc: "Interest", credit: 90, debit: 0 },
+    { account: "Savings", month: "2024-02", category: "Expense", desc: "Bank Fee", credit: 0, debit: 12 }
+  ];
+
+  new DrillDowner('#advanced-table', tx, {
+    groupOrder: ["account", "month", "category"],
+    groupOrderCombinations: [
+      ["account", "month", "category"],
+      ["category", "account", "month"]
+    ],
+    totals: ["credit", "debit", "balance"],
+    columns: ["desc"],
+    ledger: [
+      { label: "Ledger: by Month", cols: ["month", "account", "desc", "credit", "debit", "balance"], sort: ["month"] }
+    ],
+    controlsSelector: '#advanced-controls',
+    azBarSelector: '#advanced-az',
+    colProperties: {
+      account: { label: "Account", icon: "🏦" },
+      month: { label: "Month", icon: "🗓️" },
+      category: { label: "Category", icon: "📚" },
+      desc: { label: "Description" },
+      credit: { label: "Credit", formatter: (v) => v ? `+$${DrillDowner.formatNumber(v, 2)}` : '-' },
+      debit: { label: "Debit", formatter: (v) => v ? `-$${DrillDowner.formatNumber(v, 2)}` : '-' },
+      balance: {
+        label: "Running Balance",
+        balanceBehavior: { initialBalance: 10000, add: ["credit"], subtract: ["debit"] },
+        formatter: (v) => `$${DrillDowner.formatNumber(v, 2)}`
+      }
+    },
+    leafRenderer: (item) => `${item.category} <small style="color:#666">• ${item.desc}</small>`,
+    onLabelClick: (ctx) => {
+      document.getElementById('advanced-log').textContent = JSON.stringify({
+        label: ctx.label,
+        level: ctx.level,
+        path: ctx.hierarchyMap
+      }, null, 2);
+    }
+  });
+</script>
+</body>
+</html>

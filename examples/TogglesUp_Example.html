@@ -35,7 +35,8 @@
             product:  { label: "Product" },
             status:   { label: "Status" },          // togglesUp not enabled
             qty:      { label: "Qty", decimals: 0 },
-        }
+        },
+        leafRenderer: (item) => `${item.product} <small style="color:#666">(${item.status})</small>`
     });
 
     // 2) togglesUp ON: group row "status" shows combined unique statuses
@@ -49,7 +50,8 @@
             product:  { label: "Product" },
             status:   { label: "Status", togglesUp: true }, // <-- here
             qty:      { label: "Qty", decimals: 0 },
-        }
+        },
+        leafRenderer: (item) => `${item.product} <small style="color:#666">(${item.status})</small>`
     });
 
     /*
@@ -69,28 +71,30 @@
 
     // 1) togglesUp OFF: group row cells for "status" are blank
     new DrillDowner("#dd_off", data, {
-        groupOrder: ["category"],
-        columns: ["product", "status"],
+        groupOrder: ["category", "product"],
+        columns: ["status"],
         totals: ["qty"],
         colProperties: {
             category: { label: "Category" },
             product:  { label: "Product" },
             status:   { label: "Status" },          // togglesUp not enabled
             qty:      { label: "Qty", decimals: 0 },
-        }
+        },
+        leafRenderer: (item) => `${item.product} <small style="color:#666">(${item.status})</small>`
     });
 
     // 2) togglesUp ON: group row "status" shows combined unique statuses
     new DrillDowner("#dd_on", data, {
-        groupOrder: ["category"],
-        columns: ["product", "status"],
+        groupOrder: ["category", "product"],
+        columns: ["status"],
         totals: ["qty"],
         colProperties: {
             category: { label: "Category" },
             product:  { label: "Product" },
             status:   { label: "Status", togglesUp: true }, // <-- here
             qty:      { label: "Qty", decimals: 0 },
-        }
+        },
+        leafRenderer: (item) => `${item.product} <small style="color:#666">(${item.status})</small>`
     });
 
     /*

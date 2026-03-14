@@ -65,7 +65,8 @@
           }
         }
       },
-      controlsSelector: '#table-controls'
+      controlsSelector: '#table-controls',
+      leafRenderer: (item) => `${item.desc} <small style="color:#666">(${item.date})</small>`
     });
   });
 </script>

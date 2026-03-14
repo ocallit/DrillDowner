@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DrillDowner - Medium Example</title>
+  <link href="../src/drilldowner.css" rel="stylesheet" type="text/css"/>
+  <script src="../src/DrillDowner.js"></script>
+</head>
+<body>
+<h2>Medium Example (Grouped + Ledger + Controls)</h2>
+<div id="medium-controls"></div>
+<div style="display:flex; gap:16px;">
+  <div id="medium-az"></div>
+  <div id="medium-table" style="flex:1;"></div>
+</div>
+
+<script>
+  const orders = [
+    { region: "North", customer: "Atlas Co", order: "A-100", status: "Shipped", units: 30, amount: 12500 },
+    { region: "North", customer: "Atlas Co", order: "A-102", status: "Pending", units: 12, amount: 3900 },
+    { region: "North", customer: "Beacon LLC", order: "B-210", status: "Shipped", units: 6, amount: 1800 },
+    { region: "South", customer: "Crane Ltd", order: "C-005", status: "Invoiced", units: 18, amount: 6400 },
+    { region: "South", customer: "Crane Ltd", order: "C-010", status: "Pending", units: 5, amount: 1200 }
+  ];
+
+  new DrillDowner('#medium-table', orders, {
+    groupOrder: ["region", "customer", "order"],
+    groupOrderCombinations: [
+      ["region", "customer", "order"],
+      ["customer", "region", "order"]
+    ],
+    totals: ["units", "amount"],
+    columns: ["status"],
+    ledger: [
+      { label: "Ledger: Latest Amount", cols: ["region", "customer", "order", "status"], sort: ["-amount"] }
+    ],
+    controlsSelector: '#medium-controls',
+    azBarSelector: '#medium-az',
+    colProperties: {
+      region: { label: "Region", icon: "🌎" },
+      customer: { label: "Customer", icon: "🏢" },
+      order: { label: "Order", icon: "🧾" },
+      status: { label: "Status", togglesUp: true },
+      units: { label: "Units", decimals: 0 },
+      amount: { label: "Amount", formatter: (v) => `$${DrillDowner.formatNumber(v, 2)}` }
+    },
+    leafRenderer: (item) => `${item.order} <small style="color:#666">for ${item.customer}</small>`
+  });
+</script>
+</body>
+</html>

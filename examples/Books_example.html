@@ -79,6 +79,8 @@
             price:  { label: "Unit Price", decimals: 2, formatter: (v) => fmtMoney(v) },
         },
 
+        leafRenderer: (item) => `${item.title} <small style="color:#666">by ${item.author}</small>`,
+
         showGrandTotals: true,
     });
 

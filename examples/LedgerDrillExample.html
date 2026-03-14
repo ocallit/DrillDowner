@@ -144,7 +144,10 @@
             ],
 
             controlsSelector: '#table-controls',
-            azBarSelector: '#az-bar'
+            azBarSelector: '#az-bar',
+            leafRenderer: function(item) {
+                return `${item.product} <small style="color:#666">${item.info || ''}</small>`;
+            }
         });
         console.log("drillDowner initialized", drillDowner);
     });

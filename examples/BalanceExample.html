@@ -185,6 +185,8 @@
             azBarSelector: '#az-bar',
 
             // Optional: Pre-defined groupings for the dropdown
+            leafRenderer: (item) => `${item.desc} <small style="color:#666">(${item.date})</small>`,
+
             groupOrderCombinations: [
                 ["category", "type"],
                 ["type", "category"],
