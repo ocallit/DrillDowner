@@ -103,7 +103,8 @@ colProperties: {
     decimals: 2,                     // Decimal places (default 2)
     class: "text-right",             // CSS class on data cells
     labelClass: "header-bold",       // CSS class on header cells
-    formatter: (value, row) => ...,  // Custom render function
+    formatter: (value, row) => ...,  // Custom cell render function → HTML string
+    renderer: (item, level, dimension, groupOrder, options) => ..., // Full row renderer (leaf rows)
     togglesUp: true,                 // Bubble unique child values to group rows
     subTotalBy: "unit",              // Group totals by another column ("150 kg, 75 m")
     balanceBehavior: { ... },        // Running balance (see below)
@@ -114,7 +115,9 @@ colProperties: {
 
 **`formatter(value, row)`** — receives the cell value (or comma-joined unique values if `togglesUp: true`) and the first matching data row. Return an HTML string.
 
-**`togglesUp: true`** — instead of leaving group cells blank for this column, shows the distinct child values as a comma-separated list (e.g., "Active, Pending").
+**`renderer(item, level, dimension, groupOrder, options)`** — full custom renderer for leaf-level rows of this column. Takes precedence over `formatter`. `item` is the raw data object, `dimension` is the column key, `level` is the hierarchy depth.
+
+**`togglesUp: true`** — instead of leaving group cells blank for this column, shows the distinct child values as a comma-separated list (e.g., "Active, Pending"). Only applies in grouped (non-ledger) view.
 
 **`subTotalBy: "unit"`** — groups a total column's sum by the values in `unit`, showing "150 Kg, 75 m" instead of a single number.
 
@@ -127,13 +130,13 @@ Flat table view configurations. Adds "ledger" options to the grouping dropdown.
 ledger: [
   {
     label: "Full Detail",                          // Dropdown label
-    cols: ["category", "brand", "sku", "notes"],  // Columns to show
-    sort: ["category", "brand"]                    // Sort order
+    cols: ["category", "brand", "sku", "notes"],  // Columns to show in order
+    sort: ["category", "brand"]                    // Sort ascending by these columns
   },
   {
-    label: "By Brand",
-    cols: ["brand", "sku"],
-    sort: ["brand"]
+    label: "Newest First",
+    cols: ["date", "product", "amount"],
+    sort: ["-date"]                                // Prefix '-' = descending sort
   }
 ]
 ```
@@ -169,7 +172,7 @@ groupOrderCombinations: [
   ["warehouse", "product"]
 ]
 ```
-Without this, all permutations of `groupOrder` columns are auto-generated.
+When `null`, DrillDowner auto-generates permutations of `groupOrder` columns (capped at 9). Use this option to reduce dropdown noise or add combinations that cross-cut the default `groupOrder`.
 
 ---
 
@@ -195,18 +198,28 @@ Show/hide grand totals in the table header and footer.
 
 ---
 
+### `remoteUrl` *(string|null, default `null`)*
+Enables server-side row expansion. When set, drill-down actions send a **POST** request to this URL instead of expanding locally. The payload includes `action` (`'expand'`, `'expandToLevel'`, or `'change_grouping'`), `level`, `groupingDimension`, `displayNames`, `rowId`, `groupOrder`, `totals`, and `columns`. The server response is rendered by the widget. Use this for very large datasets where you don't want to ship all data to the browser.
+```javascript
+remoteUrl: "/api/drilldowner"
+```
+
+---
+
 ### `onLabelClick` *(Function|null)*
 Callback when a user clicks a group label. Use for popups, side panels, navigation.
 
 ```javascript
 onLabelClick: (ctx) => {
-  // ctx.label           → "Electronics"
-  // ctx.level           → 0
-  // ctx.column          → "category"
-  // ctx.hierarchyValues → ["Electronics"]
+  // ctx.label           → "Electronics"          (clicked label text)
+  // ctx.level           → 0                       (0 = top level)
+  // ctx.column          → "category"              (groupOrder column name at this level)
+  // ctx.isLeaf          → false                   (true if deepest level)
+  // ctx.hierarchyValues → ["Electronics"]         (path from root to clicked node)
   // ctx.hierarchyMap    → { category: "Electronics" }
   // ctx.rowElement      → <tr> DOM element
-  // ctx.groupOrder      → ["category", "brand"]
+  // ctx.groupOrder      → ["category", "brand"]  (current groupOrder)
+  // ctx.options         → { ... }                (full options object)
   openDetailPanel(ctx.hierarchyMap);
 }
 ```
@@ -214,15 +227,20 @@ onLabelClick: (ctx) => {
 ---
 
 ### `onGroupOrderChange` *(Function|null)*
-Called when the user changes the grouping via the dropdown.
-```javascript
-onGroupOrderChange: (newOrder) => console.log("Now grouped by:", newOrder)
-```
+Option is accepted by the constructor but is **not currently invoked** anywhere in the widget code. Reserved for future use — do not rely on it firing.
 
 ---
 
 ### `leafRenderer` *(Function|null)*
-Custom renderer for the deepest-level (leaf) rows. Return an HTML string or DOM element.
+Custom renderer for the deepest-level (leaf) rows. Signature: `(item, level, dimension, groupOrder, options)`. Return an HTML string.
+
+```javascript
+leafRenderer: (item, level, dimension, groupOrder, options) => {
+  return `<span class="custom">${item[dimension]}</span>`;
+}
+```
+
+Note: a per-column `renderer` in `colProperties` uses the same signature and applies only to that column.
 
 ---
 
@@ -498,7 +516,7 @@ setTimeout(() => dd.expandAll(), 2000);
 
 - The data has no natural grouping (use a plain sortable table instead).
 - You need inline editing, row selection, or pagination (DrillDowner is read-only display).
-- You need server-side data fetching / virtual scrolling for millions of rows.
+- You need virtual scrolling for millions of rows in the browser (use `remoteUrl` for server-side expansion instead).
 - You need pivot tables with cross-tabulation (DrillDowner aggregates vertically, not as a matrix).
 
 ---
