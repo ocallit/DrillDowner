@@ -1,6 +1,6 @@
 /* jshint esversion:11 */
 class DrillDowner {
-    static version = '1.2.2';
+    static version = '1.2.3';
 
     constructor(container, dataArr, options = {}) {
         this.container = typeof container === 'string' ? document.querySelector(container) : container;
@@ -445,6 +445,22 @@ class DrillDowner {
 
             // Determine if sort is Descending (starts with '-') to place Initial Balance at Bottom
             const isDescending = (led.sort && led.sort.length > 0 && led.sort[0].startsWith('-'));
+
+            // When descending, reverse within-key groups so the item with the highest running
+            // balance (accumulated last in Pass 1) appears first within each same-key bucket.
+            if(isDescending && calcKeys.length > 0) {
+                const pk = calcKeys[0];
+                let i = 0;
+                while(i < this.dataArr.length) {
+                    let j = i + 1;
+                    while(j < this.dataArr.length &&
+                    String(this.dataArr[j][pk] || '') === String(this.dataArr[i][pk] || '')) {
+                        j++;
+                    }
+                    if(j - i > 1) this.dataArr.splice(i, j - i, ...this.dataArr.slice(i, j).reverse());
+                    i = j;
+                }
+            }
 
             // --- Helper to Render Initial Balance Row ---
             const renderInitialRow = () => {
