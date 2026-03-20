@@ -350,7 +350,7 @@ Prefix for all DOM element IDs. Auto-generated as `"drillDowner" + randomString 
 
 ### `onGroupOrderChange` · `Function|null` · default `null`
 
-Defined in the constructor defaults but **never called** by the current code. Do not use.
+Defined in the constructor defaults.
 
 ---
 

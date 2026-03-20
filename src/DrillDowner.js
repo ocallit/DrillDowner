@@ -1,6 +1,6 @@
 /* jshint esversion:11 */
 class DrillDowner {
-    static version = '1.2.3';
+    static version = '1.2.4';
 
     constructor(container, dataArr, options = {}) {
         this.container = typeof container === 'string' ? document.querySelector(container) : container;
@@ -71,7 +71,7 @@ class DrillDowner {
             this.render();
             return this;
         }
-
+        const oldOrder = [...this.options.groupOrder];
         const select = this.controls.querySelector('select.drillDowner_modern_select');
         if(!select) return this;
 
@@ -102,7 +102,7 @@ class DrillDowner {
             select.value = targetValue;
         }
 
-        if (typeof this.options.onGroupOrderChange === 'function') {
+        if(typeof this.options.onGroupOrderChange === 'function') {
             this.options.onGroupOrderChange(newOrder, oldOrder, this);
         }
 
@@ -409,32 +409,38 @@ class DrillDowner {
         // --- LEDGER VIEW (FLAT) ---
         if(this.options.groupOrder.length === 0 && this.activeLedgerIndex >= 0) {
             const led = this.options.ledger[this.activeLedgerIndex];
-
-            // --- PASS 1: Calculate Running Balances in Chronological Order (Ascending) ---
             const calcKeys = (led.sort || []).map(k => k.startsWith('-') ? k.substring(1) : k);
+
             const calcList = [...this.dataArr];
-            this._sortData(calcList, calcKeys);
+            this._sortData(this.dataArr, led.sort);
 
             const runningTotals = {};
-            // Check if any column has an initial balance to decide if we need the row later
             let hasInitialBalance = false;
 
             this.options.totals.forEach(col => {
                 const props = this._getColProperty(col, 'balanceBehavior');
-                runningTotals[col] = (props && typeof props.initialBalance === 'number') ? props.initialBalance : 0;
-                if(props && typeof props.initialBalance === 'number') hasInitialBalance = true;
+                if (props) {
+                    runningTotals[col] = (typeof props.initialBalance === 'number') ? props.initialBalance : 0;
+                    if (typeof props.initialBalance === 'number') hasInitialBalance = true;
+                } else {
+                    runningTotals[col] = 0;
+                }
             });
 
             const balanceMap = new Map();
+
             calcList.forEach(item => {
                 const itemOverrides = {};
                 this.options.totals.forEach(col => {
                     const props = this._getColProperty(col, 'balanceBehavior');
-                    if(props) {
-                        //@ToDo review if there is a no balanceBehavior is defined
+                    if (props) {
                         const impact = this._calculateRowImpact(item, col);
                         runningTotals[col] += impact;
                         itemOverrides[col] = runningTotals[col];
+                    } else {
+                        // For normal totals without balanceBehavior, maybe accumulate them too?
+                        // But for now, keep original behavior
+                        itemOverrides[col] = item[col];
                     }
                 });
                 balanceMap.set(item, itemOverrides);
@@ -764,7 +770,7 @@ class DrillDowner {
 
     _appendDataCells(tr, item, gData, isLeaf, overrides = {}, level = 0, ledgerCols = null) {
         if(ledgerCols) {
-            // Ledger mode: render columns in the exact order specified by led.cols
+            // --- Render columns specified in ledger ---
             ledgerCols.forEach(col => {
                 const td = tr.insertCell();
                 const isTotal = this.options.totals.includes(col);
@@ -790,7 +796,10 @@ class DrillDowner {
                     td.className = this._getColClass(col);
                     try {
                         const renderer = this.options.colProperties[col]?.renderer ?? null;
-                        if(renderer) { td.innerHTML = renderer(item, level, col, this.options.groupOrder, this.options); return; }
+                        if(renderer) {
+                            td.innerHTML = renderer(item, level, col, this.options.groupOrder, this.options);
+                            return;
+                        }
                         let val = item[col] ?? "";
                         const fmt = this._getColFormatter(col);
                         td.innerHTML = fmt ? fmt(val, item) : val;
@@ -798,6 +807,29 @@ class DrillDowner {
                         console.error(`DrillDowner._appendDataCells: Error rendering [${col}]`, er, item);
                         td.innerHTML = '<span style="color:red" title="Render Error">⚠️</span>';
                     }
+                }
+            });
+
+            // === FIX: Render extra totals (e.g. running balance columns) that were in orderedCols but not in ledger.cols ===
+            const extraTotals = this.options.totals.filter(c => !ledgerCols.includes(c));
+            extraTotals.forEach(col => {
+                const td = tr.insertCell();
+                td.className = 'drillDowner_num';
+                try {
+                    const dec = this._getColDecimals(col);
+                    const fmt = this._getColFormatter(col);
+                    let val;
+                    if(overrides && overrides.hasOwnProperty(col)) {
+                        val = overrides[col];
+                    } else if(this._getColProperty(col, 'balanceBehavior')) {
+                        val = this._calculateRowImpact(item, col);
+                    } else {
+                        val = item[col] || 0;
+                    }
+                    td.innerHTML = fmt ? fmt(val, item) : DrillDowner.formatNumber(val, dec);
+                } catch(err) {
+                    console.error(`DrillDowner: Error rendering extra total [${col}]`, err, item);
+                    td.innerHTML = '<span style="color:red" title="Render Error">⚠️</span>';
                 }
             });
             return;
@@ -817,7 +849,10 @@ class DrillDowner {
                         if(this._getColProperty(col, 'balanceBehavior')) {
                             val = gData.reduce((s, r) => s + this._calculateRowImpact(r, col), 0);
                         } else {
-                            val = gData.reduce((s, r) => { const v = Number(r[col]); return s + (isFinite(v) ? v : 0); }, 0);
+                            val = gData.reduce((s, r) => {
+                                const v = Number(r[col]);
+                                return s + (isFinite(v) ? v : 0);
+                            }, 0);
                         }
                         td.innerHTML = fmt ? fmt(val, item) : DrillDowner.formatNumber(val, dec);
                     } else {
@@ -999,7 +1034,10 @@ class DrillDowner {
                     const startBal = (typeof props.initialBalance === 'number') ? props.initialBalance : 0;
                     t[c] = this.dataArr.reduce((s, r) => s + this._calculateRowImpact(r, c), startBal);
                 } else {
-                    t[c] = this.dataArr.reduce((s, r) => { const v = Number(r[c]); return s + (isFinite(v) ? v : 0); }, 0);
+                    t[c] = this.dataArr.reduce((s, r) => {
+                        const v = Number(r[c]);
+                        return s + (isFinite(v) ? v : 0);
+                    }, 0);
                 }
             } else {
                 const res = {};
@@ -1248,8 +1286,6 @@ class DrillDowner {
             icon.classList.add('drillDowner_drill_expanded');
         }
     }
-
-
 
 
     /* endregion: mode remote/fetch ________________________________________________________________________________ */

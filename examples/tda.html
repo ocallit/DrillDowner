@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>P&L DrillDowner</title>
+    <link rel="stylesheet" href="../src/drilldowner.css">
+    <script src="../src/DrillDowner.js"></script>
+    <style> body { font-family: Arial, sans-serif; padding: 20px; } </style>
+</head>
+<body>
+
+    <h1>Reporte P&L</h1>
+    
+    <div id="pnl-controls"></div>
+    <div id="pnl-table"></div>
+
+    <script>
+        // Your raw SQL UNION data goes here. No JS pre-processing needed!
+        const sqlData = [
+            { "clave": "Tienda Norte", "Año": "2023", "Mes": "10 Oct", "Año - Mes": "2023-10 Oct", "Es": "Venta", "Tipo": "Retail", "Cliente_es": "Público", "Venta USD": 0, "Venta": 150000, "Gasto": 0, "P&L Venta": 5000 },
+            { "clave": "Tienda Norte", "Año": "2023", "Mes": "10 Oct", "Año - Mes": "2023-10 Oct", "Es": "Gasto", "Tipo": "Gasto", "Cliente_es": "Gasto", "Venta USD": 0, "Venta": 0, "Gasto": 85000, "P&L Venta": 0 }
+        ];
+
+        // Instantiate DrillDowner normally
+        new DrillDowner('#pnl-table', sqlData, {
+            
+            // 1. Default hierarchy
+            groupOrder: ["clave", "Año - Mes", "Es", "Tipo"],
+            
+            // 2. Dropdown grouping combinations
+            groupOrderCombinations: [
+                ["clave", "Año - Mes", "Es", "Tipo"],
+                ["Año - Mes", "clave", "Es", "Tipo"]
+            ],
+            
+            // 3. Declare numerical columns (Notice we add "Neto" here even though it's not in the SQL)
+            totals: ["Venta USD", "Venta", "Gasto", "Neto", "P&L Venta"],
+            
+            // 4. Declare standard text columns
+            columns: ["Cliente_es"],
+            
+            // 5. Native Ledger Mode configurations
+            ledger: [
+                { 
+                    label: "Modo Ledger (Detalle Completo)", 
+                    cols: ["clave", "Año - Mes", "Es", "Tipo", "Cliente_es", "Venta", "Gasto", "Neto"], 
+                    sort: ["-Año - Mes", "clave"] 
+                }
+            ],
+            
+            controlsSelector: '#pnl-controls',
+            
+            // 6. Column properties & The Magic Math
+            colProperties: {
+                "clave": { label: "Tienda", icon: "🏬" },
+                "Año - Mes": { label: "Periodo", icon: "📅" },
+                "Es": { label: "Movimiento", icon: "🔄" },
+                "Cliente_es": { label: "Cliente" },
+                "Venta": { label: "Ventas", formatter: (v) => v ? `$${DrillDowner.formatNumber(v, 2)}` : '-' },
+                "Gasto": { label: "Gastos", formatter: (v) => v ? `$${DrillDowner.formatNumber(v, 2)}` : '-' },
+                
+                // Native DrillDowner feature: Calculates Net from the separate rows automatically!
+                "Neto": {
+                    label: "Neto (Venta - Gasto)",
+                    balanceBehavior: { initialBalance: 0, add: ["Venta"], subtract: ["Gasto"] },
+                    formatter: (v) => `$${DrillDowner.formatNumber(v, 2)}`
+                }
+            }
+        });
+    </script>
+</body>
+</html>

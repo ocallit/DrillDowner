@@ -212,7 +212,7 @@ classDiagram
 | `showGrandTotals` | `boolean` | `true` | Show/hide `<thead>` sub-values and `<tfoot>` row |
 | `onLabelClick` | `Function|null` | `null` | Callback when a label cell is clicked |
 | `leafRenderer` | `Function|null` | `null` | Override for leaf-row label cells; wins over `colProperties[dim].renderer` |
-| `onGroupOrderChange` | `Function|null` | `null` | Defined in defaults but **never called** — do not use |
+| `onGroupOrderChange` | `Function|null` | `null` | Defined in defaults  |
 
 ---
 

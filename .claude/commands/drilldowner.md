@@ -4,7 +4,7 @@ You are a DrillDowner integration expert. Your job is to understand the user's d
 
 # DrillDowner — API & Integration Reference
 
-**Version 1.2.2 · Zero dependencies · ES6 · Vanilla JS**
+**Version 1.2.4 · Zero dependencies · ES6 · Vanilla JS**
 
 ---
 
@@ -808,7 +808,7 @@ const dd = new DrillDowner('#table', data, options);
 Calling `new DrillDowner('#table', ...)` on a container that already has a DrillDowner instance leaves the old event listeners attached. Call `dd.destroy()` first.
 
 **Using `onGroupOrderChange`**
-This option is defined in the constructor defaults but is never called anywhere in the current code. Don't rely on it.
+This option is defined in the constructor.
 
 ---
 
