@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DrillDowner – Dimension Parking Area</title>
+  <link href="../src/drilldowner.css" rel="stylesheet" type="text/css"/>
+  <script src="../src/DrillDowner.js"></script>
+</head>
+<body>
+<h2>Dimension Parking Area Example</h2>
+<p>
+  Drag the active dimension buttons (top row) to <strong>reorder</strong> them.<br>
+  Drag a button to the parking strip (right of the "Group by" select) to <strong>remove it from grouping</strong>.<br>
+  Drag a parked dimension back onto the active row to <strong>re-add it</strong>.
+</p>
+
+<div id="controls"></div>
+<div id="table"></div>
+
+<script>
+  const data = [
+    { region: "North", rep: "Alice",   customer: "Acme",    product: "Widget",  sales: 1200, cost: 800 },
+    { region: "North", rep: "Alice",   customer: "Globex",  product: "Gadget",  sales: 950,  cost: 600 },
+    { region: "North", rep: "Bob",     customer: "Acme",    product: "Gadget",  sales: 800,  cost: 500 },
+    { region: "South", rep: "Carol",   customer: "Initech", product: "Widget",  sales: 1500, cost: 900 },
+    { region: "South", rep: "Carol",   customer: "Globex",  product: "Widget",  sales: 600,  cost: 400 },
+    { region: "South", rep: "Dave",    customer: "Initech", product: "Gadget",  sales: 1100, cost: 700 },
+    { region: "East",  rep: "Eve",     customer: "Hooli",   product: "Widget",  sales: 750,  cost: 450 },
+    { region: "East",  rep: "Eve",     customer: "Acme",    product: "Gadget",  sales: 880,  cost: 560 },
+    { region: "West",  rep: "Frank",   customer: "Hooli",   product: "Widget",  sales: 1300, cost: 820 },
+    { region: "West",  rep: "Frank",   customer: "Globex",  product: "Gadget",  sales: 970,  cost: 610 },
+  ];
+
+  new DrillDowner('#table', data, {
+    // All four dimensions available; start with three active, one parked
+    availableDimensions: ["region", "rep", "customer", "product"],
+    groupOrder:          ["region", "rep", "customer"],   // product starts parked
+
+    totals:  ["sales", "cost"],
+    columns: [],
+
+    controlsSelector: '#controls',
+
+    colProperties: {
+      region:   { label: "Region",   icon: "🌎" },
+      rep:      { label: "Rep",      icon: "👤" },
+      customer: { label: "Customer", icon: "🏢" },
+      product:  { label: "Product",  icon: "📦" },
+      sales:    { label: "Sales",    decimals: 0 },
+      cost:     { label: "Cost",     decimals: 0 },
+    },
+
+    onGroupOrderChange: (newOrder, oldOrder) => {
+      console.log('Group order changed:', oldOrder, '→', newOrder);
+    }
+  });
+</script>
+</body>
+</html>

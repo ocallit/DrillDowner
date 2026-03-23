@@ -101,6 +101,23 @@
     gap: 4px;
     margin-bottom: 16px;
     flex-wrap: wrap;
+    min-height: 34px; /* always a drop target even when empty */
+    border-radius: 6px;
+    transition: background 0.15s, outline 0.15s;
+}
+
+.drillDowner_breadcrumb_nav.drillDowner_drag_over {
+    background: #eff6ff;
+    outline: 1px dashed #93c5fd;
+}
+
+.drillDowner_nav_empty_hint {
+    font-size: 12px;
+    color: #94a3b8;
+    font-style: italic;
+    padding: 4px 6px;
+    pointer-events: none;
+    user-select: none;
 }
 
 .drillDowner_breadcrumb_item {
@@ -285,6 +302,95 @@
     outline: none;
     border-color: #3b82f6;
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Parking area – unactive dimensions sit here, to the right of the select */
+.drillDowner_parking_area {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 3px 8px 3px 10px;
+    border-left: 2px solid #e2e8f0;
+    min-width: 70px;
+    min-height: 32px;
+    border-radius: 0 6px 6px 0;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.drillDowner_parking_area.drillDowner_drag_over {
+    background: #f0fdf4;
+    border-color: #86efac;
+}
+
+.drillDowner_parking_empty {
+    font-size: 11px;
+    color: #94a3b8;
+    font-style: italic;
+    user-select: none;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+.drillDowner_parking_item {
+    display: inline-flex;
+    align-items: center;
+    cursor: grab;
+    padding: 4px 9px;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+    background: #f1f5f9;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 500;
+    user-select: none;
+    white-space: nowrap;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.drillDowner_parking_item:hover {
+    background: #e8f0fe;
+    border-color: #c7d7fd;
+    color: #374151;
+}
+
+.drillDowner_parking_item .drillDowner_drag_handle {
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.drillDowner_parking_item:hover .drillDowner_drag_handle {
+    opacity: 0.55;
+}
+
+.drillDowner_parking_item.drillDowner_dragging {
+    opacity: 0.45;
+    cursor: grabbing;
+}
+
+.drillDowner_parking_item.drillDowner_drag_over {
+    background: #dbeafe;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59,130,246,.25);
+}
+
+/* Touch / coarse pointer – larger tap targets */
+@media (pointer: coarse) {
+    .drillDowner_parking_item {
+        padding: 10px 14px;
+        font-size: 14px;
+        min-height: 44px;
+    }
+
+    .drillDowner_parking_item .drillDowner_drag_handle {
+        opacity: 0.5;
+    }
+
+    .drillDowner_parking_area {
+        gap: 6px;
+        padding: 5px 10px 5px 12px;
+        min-height: 44px;
+    }
 }
 
 /** controls & breadcrumbs **/

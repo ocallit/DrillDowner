@@ -13,6 +13,7 @@ class DrillDowner {
             colProperties: {},
             groupOrder: [],
             groupOrderCombinations: null,
+            availableDimensions: null, // all groupable dim keys; enables parking area when set
             ledger: [],
             idPrefix: 'drillDowner' + Math.random().toString(36).slice(2) + '_',
             azBarSelector: null,
@@ -268,12 +269,16 @@ class DrillDowner {
             this.controls.innerHTML = `
                 <div class="drillDowner_controls_container">
                     <div class="drillDowner_breadcrumb_nav"></div>
-                    <div class="drillDowner_grouping_controls"></div>
+                    <div class="drillDowner_grouping_controls">
+                        ${this.options.availableDimensions ? '<div class="drillDowner_parking_area"></div>' : ''}
+                    </div>
                 </div>`;
             container = this.controls.querySelector('.drillDowner_controls_container');
 
             this._renderGroupingSelect(container.querySelector('.drillDowner_grouping_controls'));
             this._renderBreadcrumbs(container.querySelector('.drillDowner_breadcrumb_nav'));
+            this._renderParkingArea();
+            this._setupDndOnControls(); // HTML5 DnD via delegation – attached once
         }
     }
 
@@ -324,6 +329,7 @@ class DrillDowner {
             }
 
             this._renderBreadcrumbs(this.controls.querySelector('.drillDowner_breadcrumb_nav'));
+            this._renderParkingArea();
             this.render();
         });
     }
@@ -331,10 +337,13 @@ class DrillDowner {
     _renderBreadcrumbs(nav) {
         nav.innerHTML = '';
         const items = [];
-        const isDraggable = this.options.groupOrder.length > 1;
+        // Draggable when: reordering (2+ active) OR parking area exists (can eject dims)
+        const hasParking = !!this.options.availableDimensions;
+        const isDraggable = this.options.groupOrder.length > 1 || (hasParking && this.options.groupOrder.length >= 1);
+
         if(this.options.groupOrder.length > 0) {
             this.options.groupOrder.forEach((key, i) => {
-                items.push(`<button type="button" class="drillDowner_breadcrumb_item" data-level="${i}"${isDraggable ? ' draggable="true"' : ''}>${isDraggable ? '<span class="drillDowner_drag_handle" aria-hidden="true"></span>' : ''}<span>${this._getGroupIcon(key)} ${this._getColHeader(key)}</span></button>`);
+                items.push(`<button type="button" class="drillDowner_breadcrumb_item" data-level="${i}" data-dim="${key}"${isDraggable ? ' draggable="true"' : ''}>${isDraggable ? '<span class="drillDowner_drag_handle" aria-hidden="true"></span>' : ''}<span>${this._getGroupIcon(key)} ${this._getColHeader(key)}</span></button>`);
                 if(i < this.options.groupOrder.length - 1) {
                     items.push(`<button type="button" class="drillDowner_breadcrumb_arrow drillDowner_collapsed" data-arrow-level="${i}">
                         <span class="drillDowner_arrow_icon">▶</span>
@@ -344,6 +353,8 @@ class DrillDowner {
         } else if(this.activeLedgerIndex >= 0) {
             const label = this.options.ledger[this.activeLedgerIndex].label;
             items.push(`<span class="drillDowner_breadcrumb_item" style="cursor:default"><b>${label}</b></span>`);
+        } else if(hasParking) {
+            items.push(`<span class="drillDowner_nav_empty_hint">drag a dimension here to group</span>`);
         }
         nav.innerHTML = items.join('');
 
@@ -359,111 +370,196 @@ class DrillDowner {
             };
         });
 
-        if(isDraggable) this._setupBreadcrumbDrag(nav);
+        if(isDraggable || hasParking) this._setupTouchOnDraggables(nav);
     }
 
-    _setupBreadcrumbDrag(nav) {
+    // ── HTML5 DnD via event delegation – wired once on this.controls ──────────
+    _setupDndOnControls() {
+        if(!this.controls || this._dndListenersAttached) return;
+        this._dndListenersAttached = true;
         const self = this;
-        let dragSrcLevel = null;
 
-        nav.querySelectorAll('.drillDowner_breadcrumb_item[data-level]').forEach(btn => {
-            // ── HTML5 Drag & Drop – desktop + Safari Mac ───────────────────
-            btn.addEventListener('dragstart', (e) => {
-                dragSrcLevel = parseInt(btn.dataset.level);
+        this.controls.addEventListener('dragstart', (e) => {
+            const navBtn  = e.target.closest('.drillDowner_breadcrumb_item[data-level]');
+            const parkBtn = e.target.closest('.drillDowner_parking_item[data-dim]');
+            if(navBtn) {
+                self._h5Zone = 'nav';
+                self._h5Idx  = parseInt(navBtn.dataset.level);
                 e.dataTransfer.effectAllowed = 'move';
-                e.dataTransfer.setData('text/plain', String(dragSrcLevel));
-                // Delay class so the drag ghost captures the un-dimmed state
-                setTimeout(() => btn.classList.add('drillDowner_dragging'), 0);
-            });
+                e.dataTransfer.setData('text/plain', `nav:${navBtn.dataset.level}`);
+                setTimeout(() => navBtn.classList.add('drillDowner_dragging'), 0);
+            } else if(parkBtn) {
+                self._h5Zone = 'parking';
+                self._h5Dim  = parkBtn.dataset.dim;
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', `parking:${parkBtn.dataset.dim}`);
+                setTimeout(() => parkBtn.classList.add('drillDowner_dragging'), 0);
+            }
+        });
 
-            btn.addEventListener('dragend', () => {
-                btn.classList.remove('drillDowner_dragging');
-                nav.querySelectorAll('.drillDowner_breadcrumb_item').forEach(b =>
-                    b.classList.remove('drillDowner_drag_over'));
-                dragSrcLevel = null;
-            });
+        this.controls.addEventListener('dragend', () => {
+            self.controls.querySelectorAll('.drillDowner_dragging,.drillDowner_drag_over')
+                .forEach(el => el.classList.remove('drillDowner_dragging', 'drillDowner_drag_over'));
+            self._h5Zone = null;
+        });
 
-            btn.addEventListener('dragover', (e) => {
+        this.controls.addEventListener('dragover', (e) => {
+            if(!self._h5Zone) return;
+            if(e.target.closest('.drillDowner_breadcrumb_item[data-level]') ||
+               e.target.closest('.drillDowner_breadcrumb_nav') ||
+               e.target.closest('.drillDowner_parking_area')) {
                 e.preventDefault();
                 e.dataTransfer.dropEffect = 'move';
-            });
+            }
+        });
 
-            btn.addEventListener('dragenter', (e) => {
-                e.preventDefault();
-                nav.querySelectorAll('.drillDowner_breadcrumb_item').forEach(b =>
-                    b.classList.remove('drillDowner_drag_over'));
-                if(parseInt(btn.dataset.level) !== dragSrcLevel)
-                    btn.classList.add('drillDowner_drag_over');
-            });
+        this.controls.addEventListener('dragenter', (e) => {
+            if(!self._h5Zone) return;
+            self.controls.querySelectorAll('.drillDowner_drag_over')
+                .forEach(el => el.classList.remove('drillDowner_drag_over'));
 
-            btn.addEventListener('dragleave', () => {
-                btn.classList.remove('drillDowner_drag_over');
-            });
+            const navBtn  = e.target.closest('.drillDowner_breadcrumb_item[data-level]');
+            const parkArea = !e.target.closest('.drillDowner_parking_item') &&
+                              e.target.closest('.drillDowner_parking_area');
+            const navArea  = !navBtn && e.target.closest('.drillDowner_breadcrumb_nav');
 
-            btn.addEventListener('drop', (e) => {
-                e.preventDefault();
-                const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
-                const toIdx   = parseInt(btn.dataset.level);
-                nav.querySelectorAll('.drillDowner_breadcrumb_item').forEach(b =>
-                    b.classList.remove('drillDowner_dragging', 'drillDowner_drag_over'));
-                if(!isNaN(fromIdx) && !isNaN(toIdx) && fromIdx !== toIdx)
-                    self._applyNewGroupOrder(self._reorderArray(self.options.groupOrder, fromIdx, toIdx));
-            });
+            if(navBtn) {
+                const isSelf = self._h5Zone === 'nav' && parseInt(navBtn.dataset.level) === self._h5Idx;
+                if(!isSelf) navBtn.classList.add('drillDowner_drag_over');
+            } else if(navArea && self._h5Zone === 'parking') {
+                navArea.classList.add('drillDowner_drag_over');
+            } else if(parkArea && self._h5Zone === 'nav') {
+                parkArea.classList.add('drillDowner_drag_over');
+            }
+        });
 
-            // ── Touch – iOS Safari & touch screens ────────────────────────
-            let ts = null; // touch state
+        this.controls.addEventListener('dragleave', (e) => {
+            const hi = e.target.closest('.drillDowner_drag_over');
+            if(hi && !hi.contains(e.relatedTarget)) hi.classList.remove('drillDowner_drag_over');
+        });
 
-            btn.addEventListener('touchstart', (e) => {
+        this.controls.addEventListener('drop', (e) => {
+            if(!self._h5Zone) return;
+            e.preventDefault();
+            self.controls.querySelectorAll('.drillDowner_dragging,.drillDowner_drag_over')
+                .forEach(el => el.classList.remove('drillDowner_dragging', 'drillDowner_drag_over'));
+
+            const navBtn  = e.target.closest('.drillDowner_breadcrumb_item[data-level]');
+            const parkArea = e.target.closest('.drillDowner_parking_area');
+            const navArea  = !navBtn && e.target.closest('.drillDowner_breadcrumb_nav');
+
+            if(self._h5Zone === 'nav') {
+                const fromIdx = self._h5Idx;
+                if(navBtn) {
+                    const toIdx = parseInt(navBtn.dataset.level);
+                    if(fromIdx !== toIdx)
+                        self._applyNewGroupOrder(self._reorderArray(self.options.groupOrder, fromIdx, toIdx));
+                } else if(parkArea) {
+                    const newOrder = [...self.options.groupOrder];
+                    newOrder.splice(fromIdx, 1);
+                    self._applyNewGroupOrder(newOrder);
+                }
+            } else if(self._h5Zone === 'parking') {
+                const dim = self._h5Dim;
+                if(navBtn) {
+                    const toIdx = parseInt(navBtn.dataset.level);
+                    const newOrder = [...self.options.groupOrder];
+                    newOrder.splice(toIdx, 0, dim);
+                    self._applyNewGroupOrder(newOrder);
+                } else if(navArea) {
+                    self._applyNewGroupOrder([...self.options.groupOrder, dim]);
+                }
+            }
+            self._h5Zone = null;
+        });
+    }
+
+    // ── Touch drag – per-element, handles cross-zone (nav ↔ parking) ────────
+    _setupTouchOnDraggables(container) {
+        const self = this;
+        container.querySelectorAll('[draggable="true"]').forEach(el => {
+            let ts = null;
+
+            el.addEventListener('touchstart', (e) => {
                 if(e.touches.length !== 1) return;
                 const t = e.touches[0];
-                ts = { startX: t.clientX, startY: t.clientY, dragging: false, target: null };
+                ts = { startX: t.clientX, startY: t.clientY, dragging: false,
+                       targetType: null, target: null };
             }, { passive: true });
 
-            btn.addEventListener('touchmove', (e) => {
+            el.addEventListener('touchmove', (e) => {
                 if(!ts) return;
                 const t = e.touches[0];
-                const dx = Math.abs(t.clientX - ts.startX);
-                const dy = Math.abs(t.clientY - ts.startY);
+                const dx = Math.abs(t.clientX - ts.startX), dy = Math.abs(t.clientY - ts.startY);
                 if(!ts.dragging && (dx > 8 || dy > 8)) {
                     ts.dragging = true;
-                    btn.classList.add('drillDowner_dragging');
+                    el.classList.add('drillDowner_dragging');
                 }
                 if(!ts.dragging) return;
-                e.preventDefault(); // prevent scroll while dragging
+                e.preventDefault();
 
-                const el = document.elementFromPoint(t.clientX, t.clientY);
-                const tgt = el && el.closest('.drillDowner_breadcrumb_item[data-level]');
-                nav.querySelectorAll('.drillDowner_breadcrumb_item').forEach(b =>
-                    b.classList.remove('drillDowner_drag_over'));
-                if(tgt && tgt !== btn) {
-                    tgt.classList.add('drillDowner_drag_over');
-                    ts.target = tgt;
+                const pt       = document.elementFromPoint(t.clientX, t.clientY);
+                const navBtn   = pt && pt.closest('.drillDowner_breadcrumb_item[data-level]');
+                const parkArea = pt && !pt.closest('.drillDowner_parking_item') &&
+                                  pt.closest('.drillDowner_parking_area');
+                const navArea  = !navBtn && pt && pt.closest('.drillDowner_breadcrumb_nav');
+
+                if(self.controls) self.controls.querySelectorAll('.drillDowner_drag_over')
+                    .forEach(b => b.classList.remove('drillDowner_drag_over'));
+
+                if(navBtn && navBtn !== el) {
+                    navBtn.classList.add('drillDowner_drag_over');
+                    ts.targetType = 'navBtn'; ts.target = navBtn;
+                } else if(parkArea && !parkArea.contains(el)) {
+                    parkArea.classList.add('drillDowner_drag_over');
+                    ts.targetType = 'parkArea'; ts.target = parkArea;
+                } else if(navArea && !navArea.contains(el)) {
+                    navArea.classList.add('drillDowner_drag_over');
+                    ts.targetType = 'navArea'; ts.target = navArea;
                 } else {
-                    ts.target = null;
+                    ts.targetType = null; ts.target = null;
                 }
             }, { passive: false });
 
-            btn.addEventListener('touchend', (e) => {
+            el.addEventListener('touchend', (e) => {
                 if(!ts) return;
-                const { dragging, target } = ts;
-                btn.classList.remove('drillDowner_dragging');
-                nav.querySelectorAll('.drillDowner_breadcrumb_item').forEach(b =>
-                    b.classList.remove('drillDowner_drag_over'));
-                ts = null;
-                if(!dragging || !target) return;
-                e.preventDefault(); // suppress synthesised click after drag
-                const fromIdx = parseInt(btn.dataset.level);
-                const toIdx   = parseInt(target.dataset.level);
-                if(!isNaN(fromIdx) && !isNaN(toIdx) && fromIdx !== toIdx)
-                    self._applyNewGroupOrder(self._reorderArray(self.options.groupOrder, fromIdx, toIdx));
+                const state = ts; ts = null;
+                el.classList.remove('drillDowner_dragging');
+                if(self.controls) self.controls.querySelectorAll('.drillDowner_drag_over')
+                    .forEach(b => b.classList.remove('drillDowner_drag_over'));
+                if(!state.dragging || !state.targetType) return;
+                e.preventDefault();
+
+                const isNavEl = !!el.closest('.drillDowner_breadcrumb_nav');
+                if(isNavEl) {
+                    const fromIdx = parseInt(el.dataset.level);
+                    if(state.targetType === 'navBtn') {
+                        const toIdx = parseInt(state.target.dataset.level);
+                        if(fromIdx !== toIdx)
+                            self._applyNewGroupOrder(self._reorderArray(self.options.groupOrder, fromIdx, toIdx));
+                    } else if(state.targetType === 'parkArea') {
+                        const newOrder = [...self.options.groupOrder];
+                        newOrder.splice(fromIdx, 1);
+                        self._applyNewGroupOrder(newOrder);
+                    }
+                } else { // parking item
+                    const dim = el.dataset.dim;
+                    if(state.targetType === 'navBtn') {
+                        const toIdx = parseInt(state.target.dataset.level);
+                        const newOrder = [...self.options.groupOrder];
+                        newOrder.splice(toIdx, 0, dim);
+                        self._applyNewGroupOrder(newOrder);
+                    } else if(state.targetType === 'navArea') {
+                        self._applyNewGroupOrder([...self.options.groupOrder, dim]);
+                    }
+                }
             });
 
-            btn.addEventListener('touchcancel', () => {
-                if(!ts) return;
-                btn.classList.remove('drillDowner_dragging');
-                nav.querySelectorAll('.drillDowner_breadcrumb_item').forEach(b =>
-                    b.classList.remove('drillDowner_drag_over'));
-                ts = null;
+            el.addEventListener('touchcancel', () => {
+                if(!ts) return; ts = null;
+                el.classList.remove('drillDowner_dragging');
+                if(self.controls) self.controls.querySelectorAll('.drillDowner_drag_over')
+                    .forEach(b => b.classList.remove('drillDowner_drag_over'));
             });
         });
     }
@@ -517,9 +613,10 @@ class DrillDowner {
         if(typeof this.options.onGroupOrderChange === 'function')
             this.options.onGroupOrderChange(newOrder, oldOrder, this);
 
-        // Re-render breadcrumbs then table
+        // Re-render breadcrumbs, parking area, then table
         const nav = this.controls && this.controls.querySelector('.drillDowner_breadcrumb_nav');
         if(nav) this._renderBreadcrumbs(nav);
+        this._renderParkingArea();
         this.render();
     }
 
@@ -530,6 +627,29 @@ class DrillDowner {
             arrow.classList.toggle('drillDowner_expanded', isExpanded);
             arrow.classList.toggle('drillDowner_collapsed', !isExpanded);
         });
+    }
+
+    _getParkedDimensions() {
+        if(!this.options.availableDimensions) return [];
+        return this.options.availableDimensions.filter(d => !this.options.groupOrder.includes(d));
+    }
+
+    _renderParkingArea() {
+        if(!this.options.availableDimensions || !this.controls) return;
+        const div = this.controls.querySelector('.drillDowner_parking_area');
+        if(!div) return;
+
+        const parked = this._getParkedDimensions();
+        if(parked.length === 0) {
+            div.innerHTML = '<span class="drillDowner_parking_empty">drag here to remove from grouping</span>';
+            return;
+        }
+
+        div.innerHTML = parked.map(key =>
+            `<button type="button" class="drillDowner_parking_item" data-dim="${key}" draggable="true"><span class="drillDowner_drag_handle" aria-hidden="true"></span><span>${this._getGroupIcon(key)} ${this._getColHeader(key)}</span></button>`
+        ).join('');
+
+        this._setupTouchOnDraggables(div);
     }
 
     // ---------- Table Rendering ----------
