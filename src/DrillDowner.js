@@ -269,9 +269,7 @@ class DrillDowner {
             this.controls.innerHTML = `
                 <div class="drillDowner_controls_container">
                     <div class="drillDowner_breadcrumb_nav"></div>
-                    <div class="drillDowner_grouping_controls">
-                        ${this.options.availableDimensions ? '<div class="drillDowner_parking_area"></div>' : ''}
-                    </div>
+                    <div class="drillDowner_grouping_controls"></div>
                 </div>`;
             container = this.controls.querySelector('.drillDowner_controls_container');
 
@@ -306,7 +304,7 @@ class DrillDowner {
             <label class="drillDowner_control_label">Group by:
             <select class="drillDowner_modern_select">${optionsHtml}</select>
             </label>
-        </div>`;
+        </div>${this.options.availableDimensions ? '<div class="drillDowner_parking_area"></div>' : ''}`;
 
         div.querySelector('select').addEventListener('change', (e) => {
             const val = e.target.value;
