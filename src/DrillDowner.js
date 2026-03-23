@@ -331,11 +331,10 @@ class DrillDowner {
     _renderBreadcrumbs(nav) {
         nav.innerHTML = '';
         const items = [];
+        const isDraggable = this.options.groupOrder.length > 1;
         if(this.options.groupOrder.length > 0) {
             this.options.groupOrder.forEach((key, i) => {
-                items.push(`<button type="button" class="drillDowner_breadcrumb_item" data-level="${i}">
-                    <span>${this._getGroupIcon(key)} ${this._getColHeader(key)}</span>
-                </button>`);
+                items.push(`<button type="button" class="drillDowner_breadcrumb_item" data-level="${i}"${isDraggable ? ' draggable="true"' : ''}>${isDraggable ? '<span class="drillDowner_drag_handle" aria-hidden="true"></span>' : ''}<span>${this._getGroupIcon(key)} ${this._getColHeader(key)}</span></button>`);
                 if(i < this.options.groupOrder.length - 1) {
                     items.push(`<button type="button" class="drillDowner_breadcrumb_arrow drillDowner_collapsed" data-arrow-level="${i}">
                         <span class="drillDowner_arrow_icon">▶</span>
@@ -359,6 +358,169 @@ class DrillDowner {
                 this.showToLevel(btn.classList.contains('drillDowner_expanded') ? lvl : lvl + 1);
             };
         });
+
+        if(isDraggable) this._setupBreadcrumbDrag(nav);
+    }
+
+    _setupBreadcrumbDrag(nav) {
+        const self = this;
+        let dragSrcLevel = null;
+
+        nav.querySelectorAll('.drillDowner_breadcrumb_item[data-level]').forEach(btn => {
+            // ── HTML5 Drag & Drop – desktop + Safari Mac ───────────────────
+            btn.addEventListener('dragstart', (e) => {
+                dragSrcLevel = parseInt(btn.dataset.level);
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', String(dragSrcLevel));
+                // Delay class so the drag ghost captures the un-dimmed state
+                setTimeout(() => btn.classList.add('drillDowner_dragging'), 0);
+            });
+
+            btn.addEventListener('dragend', () => {
+                btn.classList.remove('drillDowner_dragging');
+                nav.querySelectorAll('.drillDowner_breadcrumb_item').forEach(b =>
+                    b.classList.remove('drillDowner_drag_over'));
+                dragSrcLevel = null;
+            });
+
+            btn.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+            });
+
+            btn.addEventListener('dragenter', (e) => {
+                e.preventDefault();
+                nav.querySelectorAll('.drillDowner_breadcrumb_item').forEach(b =>
+                    b.classList.remove('drillDowner_drag_over'));
+                if(parseInt(btn.dataset.level) !== dragSrcLevel)
+                    btn.classList.add('drillDowner_drag_over');
+            });
+
+            btn.addEventListener('dragleave', () => {
+                btn.classList.remove('drillDowner_drag_over');
+            });
+
+            btn.addEventListener('drop', (e) => {
+                e.preventDefault();
+                const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
+                const toIdx   = parseInt(btn.dataset.level);
+                nav.querySelectorAll('.drillDowner_breadcrumb_item').forEach(b =>
+                    b.classList.remove('drillDowner_dragging', 'drillDowner_drag_over'));
+                if(!isNaN(fromIdx) && !isNaN(toIdx) && fromIdx !== toIdx)
+                    self._applyNewGroupOrder(self._reorderArray(self.options.groupOrder, fromIdx, toIdx));
+            });
+
+            // ── Touch – iOS Safari & touch screens ────────────────────────
+            let ts = null; // touch state
+
+            btn.addEventListener('touchstart', (e) => {
+                if(e.touches.length !== 1) return;
+                const t = e.touches[0];
+                ts = { startX: t.clientX, startY: t.clientY, dragging: false, target: null };
+            }, { passive: true });
+
+            btn.addEventListener('touchmove', (e) => {
+                if(!ts) return;
+                const t = e.touches[0];
+                const dx = Math.abs(t.clientX - ts.startX);
+                const dy = Math.abs(t.clientY - ts.startY);
+                if(!ts.dragging && (dx > 8 || dy > 8)) {
+                    ts.dragging = true;
+                    btn.classList.add('drillDowner_dragging');
+                }
+                if(!ts.dragging) return;
+                e.preventDefault(); // prevent scroll while dragging
+
+                const el = document.elementFromPoint(t.clientX, t.clientY);
+                const tgt = el && el.closest('.drillDowner_breadcrumb_item[data-level]');
+                nav.querySelectorAll('.drillDowner_breadcrumb_item').forEach(b =>
+                    b.classList.remove('drillDowner_drag_over'));
+                if(tgt && tgt !== btn) {
+                    tgt.classList.add('drillDowner_drag_over');
+                    ts.target = tgt;
+                } else {
+                    ts.target = null;
+                }
+            }, { passive: false });
+
+            btn.addEventListener('touchend', (e) => {
+                if(!ts) return;
+                const { dragging, target } = ts;
+                btn.classList.remove('drillDowner_dragging');
+                nav.querySelectorAll('.drillDowner_breadcrumb_item').forEach(b =>
+                    b.classList.remove('drillDowner_drag_over'));
+                ts = null;
+                if(!dragging || !target) return;
+                e.preventDefault(); // suppress synthesised click after drag
+                const fromIdx = parseInt(btn.dataset.level);
+                const toIdx   = parseInt(target.dataset.level);
+                if(!isNaN(fromIdx) && !isNaN(toIdx) && fromIdx !== toIdx)
+                    self._applyNewGroupOrder(self._reorderArray(self.options.groupOrder, fromIdx, toIdx));
+            });
+
+            btn.addEventListener('touchcancel', () => {
+                if(!ts) return;
+                btn.classList.remove('drillDowner_dragging');
+                nav.querySelectorAll('.drillDowner_breadcrumb_item').forEach(b =>
+                    b.classList.remove('drillDowner_drag_over'));
+                ts = null;
+            });
+        });
+    }
+
+    _reorderArray(arr, fromIdx, toIdx) {
+        const result = [...arr];
+        const [item] = result.splice(fromIdx, 1);
+        result.splice(toIdx, 0, item);
+        return result;
+    }
+
+    _applyNewGroupOrder(newOrder) {
+        const oldOrder = [...this.options.groupOrder];
+        this.options.groupOrder = newOrder;
+        this.activeLedgerIndex = -1;
+        this.options.columns = [...this._defaultColumns];
+
+        // Sync the select box silently (no 'change' event – avoids double render)
+        const select = this.controls && this.controls.querySelector('select.drillDowner_modern_select');
+        if(select) {
+            const targetValue = newOrder.join(',');
+            let found = false;
+
+            if(this.options.groupOrderCombinations) {
+                for(let i = 0; i < this.options.groupOrderCombinations.length; i++) {
+                    if(this.options.groupOrderCombinations[i].join(',') === targetValue) {
+                        select.selectedIndex = i;
+                        found = true;
+                        break;
+                    }
+                }
+            }
+
+            if(!found) {
+                for(let i = 0; i < select.options.length; i++) {
+                    if(select.options[i].value === targetValue) {
+                        select.selectedIndex = i;
+                        found = true;
+                        break;
+                    }
+                }
+            }
+
+            if(!found) {
+                const label = newOrder.map(col => this._getColHeader(col)).join(' → ');
+                select.add(new Option(label, targetValue));
+                select.value = targetValue;
+            }
+        }
+
+        if(typeof this.options.onGroupOrderChange === 'function')
+            this.options.onGroupOrderChange(newOrder, oldOrder, this);
+
+        // Re-render breadcrumbs then table
+        const nav = this.controls && this.controls.querySelector('.drillDowner_breadcrumb_nav');
+        if(nav) this._renderBreadcrumbs(nav);
+        this.render();
     }
 
     _updateBreadcrumbVisuals(level) {
