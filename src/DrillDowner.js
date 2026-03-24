@@ -41,6 +41,10 @@ class DrillDowner {
         this._defaultColumns = [...this.options.columns];
         this.options.colProperties = this.options.colProperties || {};
 
+        // Parked-dimensions feature state
+        this._parkedEnabled = new Set(); // keys of parked dims whose checkbox is checked (shown as columns)
+        this._parkedOrder   = this.options.availableDimensions ? [...this.options.availableDimensions] : [];
+
         this.azBar = this.options.azBarSelector ? (typeof this.options.azBarSelector === 'string' ?
             document.querySelector(this.options.azBarSelector) : this.options.azBarSelector) : null;
         this.controls = this.options.controlsSelector ? (typeof this.options.controlsSelector === 'string' ?
@@ -416,9 +420,9 @@ class DrillDowner {
             self.controls.querySelectorAll('.drillDowner_drag_over')
                 .forEach(el => el.classList.remove('drillDowner_drag_over'));
 
-            const navBtn  = e.target.closest('.drillDowner_breadcrumb_item[data-level]');
-            const parkArea = !e.target.closest('.drillDowner_parking_item') &&
-                              e.target.closest('.drillDowner_parking_area');
+            const navBtn   = e.target.closest('.drillDowner_breadcrumb_item[data-level]');
+            const parkItem = !navBtn && e.target.closest('.drillDowner_parking_item[data-dim]');
+            const parkArea = !navBtn && !parkItem && e.target.closest('.drillDowner_parking_area');
             const navArea  = !navBtn && e.target.closest('.drillDowner_breadcrumb_nav');
 
             if(navBtn) {
@@ -428,6 +432,8 @@ class DrillDowner {
                 navArea.classList.add('drillDowner_drag_over');
             } else if(parkArea && self._h5Zone === 'nav') {
                 parkArea.classList.add('drillDowner_drag_over');
+            } else if(parkItem && self._h5Zone === 'parking' && parkItem.dataset.dim !== self._h5Dim) {
+                parkItem.classList.add('drillDowner_drag_over');
             }
         });
 
@@ -442,8 +448,9 @@ class DrillDowner {
             self.controls.querySelectorAll('.drillDowner_dragging,.drillDowner_drag_over')
                 .forEach(el => el.classList.remove('drillDowner_dragging', 'drillDowner_drag_over'));
 
-            const navBtn  = e.target.closest('.drillDowner_breadcrumb_item[data-level]');
-            const parkArea = e.target.closest('.drillDowner_parking_area');
+            const navBtn   = e.target.closest('.drillDowner_breadcrumb_item[data-level]');
+            const parkItem = !navBtn && e.target.closest('.drillDowner_parking_item[data-dim]');
+            const parkArea = !navBtn && !parkItem && e.target.closest('.drillDowner_parking_area');
             const navArea  = !navBtn && e.target.closest('.drillDowner_breadcrumb_nav');
 
             if(self._h5Zone === 'nav') {
@@ -452,7 +459,8 @@ class DrillDowner {
                     const toIdx = parseInt(navBtn.dataset.level);
                     if(fromIdx !== toIdx)
                         self._applyNewGroupOrder(self._reorderArray(self.options.groupOrder, fromIdx, toIdx));
-                } else if(parkArea) {
+                } else if(parkArea || parkItem) {
+                    // Drop on parking background or a parked item: remove from active grouping
                     const newOrder = [...self.options.groupOrder];
                     newOrder.splice(fromIdx, 1);
                     self._applyNewGroupOrder(newOrder);
@@ -466,6 +474,16 @@ class DrillDowner {
                     self._applyNewGroupOrder(newOrder);
                 } else if(navArea) {
                     self._applyNewGroupOrder([...self.options.groupOrder, dim]);
+                } else if(parkItem && parkItem.dataset.dim !== dim) {
+                    // Reorder parked items
+                    const toDim   = parkItem.dataset.dim;
+                    const fromIdx = self._parkedOrder.indexOf(dim);
+                    const toIdx   = self._parkedOrder.indexOf(toDim);
+                    if(fromIdx !== -1 && toIdx !== -1) {
+                        self._parkedOrder = self._reorderArray(self._parkedOrder, fromIdx, toIdx);
+                        self._renderParkingArea();
+                        if(self._parkedEnabled.has(dim) || self._parkedEnabled.has(toDim)) self.render();
+                    }
                 }
             }
             self._h5Zone = null;
@@ -479,6 +497,7 @@ class DrillDowner {
             let ts = null;
 
             el.addEventListener('touchstart', (e) => {
+                if(e.target.closest('input[type=checkbox]')) return; // let checkbox handle its own touch
                 if(e.touches.length !== 1) return;
                 const t = e.touches[0];
                 ts = { startX: t.clientX, startY: t.clientY, dragging: false,
@@ -498,8 +517,8 @@ class DrillDowner {
 
                 const pt       = document.elementFromPoint(t.clientX, t.clientY);
                 const navBtn   = pt && pt.closest('.drillDowner_breadcrumb_item[data-level]');
-                const parkArea = pt && !pt.closest('.drillDowner_parking_item') &&
-                                  pt.closest('.drillDowner_parking_area');
+                const parkItem = pt && !navBtn && pt.closest('.drillDowner_parking_item[data-dim]');
+                const parkArea = pt && !navBtn && !parkItem && pt.closest('.drillDowner_parking_area');
                 const navArea  = !navBtn && pt && pt.closest('.drillDowner_breadcrumb_nav');
 
                 if(self.controls) self.controls.querySelectorAll('.drillDowner_drag_over')
@@ -508,6 +527,9 @@ class DrillDowner {
                 if(navBtn && navBtn !== el) {
                     navBtn.classList.add('drillDowner_drag_over');
                     ts.targetType = 'navBtn'; ts.target = navBtn;
+                } else if(parkItem && parkItem !== el) {
+                    parkItem.classList.add('drillDowner_drag_over');
+                    ts.targetType = 'parkItem'; ts.target = parkItem;
                 } else if(parkArea && !parkArea.contains(el)) {
                     parkArea.classList.add('drillDowner_drag_over');
                     ts.targetType = 'parkArea'; ts.target = parkArea;
@@ -535,7 +557,8 @@ class DrillDowner {
                         const toIdx = parseInt(state.target.dataset.level);
                         if(fromIdx !== toIdx)
                             self._applyNewGroupOrder(self._reorderArray(self.options.groupOrder, fromIdx, toIdx));
-                    } else if(state.targetType === 'parkArea') {
+                    } else if(state.targetType === 'parkArea' || state.targetType === 'parkItem') {
+                        // Remove from active grouping (drop on parking zone)
                         const newOrder = [...self.options.groupOrder];
                         newOrder.splice(fromIdx, 1);
                         self._applyNewGroupOrder(newOrder);
@@ -549,6 +572,16 @@ class DrillDowner {
                         self._applyNewGroupOrder(newOrder);
                     } else if(state.targetType === 'navArea') {
                         self._applyNewGroupOrder([...self.options.groupOrder, dim]);
+                    } else if(state.targetType === 'parkItem' && state.target.dataset.dim !== dim) {
+                        // Reorder parked items
+                        const toDim   = state.target.dataset.dim;
+                        const fromIdx = self._parkedOrder.indexOf(dim);
+                        const toIdx   = self._parkedOrder.indexOf(toDim);
+                        if(fromIdx !== -1 && toIdx !== -1) {
+                            self._parkedOrder = self._reorderArray(self._parkedOrder, fromIdx, toIdx);
+                            self._renderParkingArea();
+                            if(self._parkedEnabled.has(dim) || self._parkedEnabled.has(toDim)) self.render();
+                        }
                     }
                 }
             });
@@ -629,7 +662,8 @@ class DrillDowner {
 
     _getParkedDimensions() {
         if(!this.options.availableDimensions) return [];
-        return this.options.availableDimensions.filter(d => !this.options.groupOrder.includes(d));
+        // Use _parkedOrder (user-arranged) as the authoritative sequence; filter to only those not active
+        return this._parkedOrder.filter(d => !this.options.groupOrder.includes(d));
     }
 
     _renderParkingArea() {
@@ -643,9 +677,27 @@ class DrillDowner {
             return;
         }
 
-        div.innerHTML = parked.map(key =>
-            `<button type="button" class="drillDowner_parking_item" data-dim="${key}" draggable="true"><span class="drillDowner_drag_handle" aria-hidden="true"></span><span>${this._getGroupIcon(key)} ${this._getColHeader(key)}</span></button>`
-        ).join('');
+        div.innerHTML = parked.map(key => {
+            const checked = this._parkedEnabled.has(key) ? ' checked' : '';
+            return `<div class="drillDowner_parking_item" data-dim="${key}" draggable="true">` +
+                `<span class="drillDowner_drag_handle" aria-hidden="true"></span>` +
+                `<input type="checkbox" class="drillDowner_parking_checkbox" data-dim="${key}"${checked} tabindex="-1" aria-label="${this._getColHeader(key)} as column">` +
+                `<span>${this._getGroupIcon(key)} ${this._getColHeader(key)}</span>` +
+                `</div>`;
+        }).join('');
+
+        // Checkbox toggle: add/remove from enabled set and re-render table
+        div.querySelectorAll('.drillDowner_parking_checkbox').forEach(cb => {
+            cb.addEventListener('change', (e) => {
+                e.stopPropagation();
+                const dim = e.target.dataset.dim;
+                if(e.target.checked) this._parkedEnabled.add(dim);
+                else this._parkedEnabled.delete(dim);
+                this.render();
+            });
+            // Prevent accidental drag when user clicks the checkbox
+            cb.addEventListener('mousedown', e => e.stopPropagation());
+        });
 
         this._setupTouchOnDraggables(div);
     }
@@ -657,9 +709,11 @@ class DrillDowner {
         const groupCols = this.options.groupOrder.length > 0 ? ["Item"] : ["#"];
         const activeLed = (this.options.groupOrder.length === 0 && this.activeLedgerIndex >= 0)
             ? this.options.ledger[this.activeLedgerIndex] : null;
+        // Parked dimensions whose checkbox is checked appear as extra columns (in user-arranged order)
+        const parkedActiveCols = this._getParkedDimensions().filter(d => this._parkedEnabled.has(d));
         const orderedCols = activeLed?.cols
             ? [...activeLed.cols, ...this.options.totals.filter(c => !activeLed.cols.includes(c))]
-            : [...this.options.totals, ...this.options.columns];
+            : [...this.options.totals, ...this.options.columns, ...parkedActiveCols];
         const allHeaders = [...groupCols, ...orderedCols.map(c => this._getColHeader(c))];
 
         const table = document.createElement('table');
@@ -1178,7 +1232,29 @@ class DrillDowner {
                 const fmt = this._getColFormatter(col);
                 td.innerHTML = fmt ? fmt(val, item) : val;
             } catch(er) {
-                console.error(`DrillDowner._appendDataCells: Error rendering [${col}]`, err, item);
+                console.error(`DrillDowner._appendDataCells: Error rendering [${col}]`, er, item);
+                td.innerHTML = '<span style="color:red" title="Render Error">⚠️</span>';
+            }
+        });
+
+        // Render checked parked-dimension columns (in user-arranged order)
+        const parkedActiveCols = this._getParkedDimensions().filter(d => this._parkedEnabled.has(d));
+        parkedActiveCols.forEach(col => {
+            const td = tr.insertCell();
+            td.className = this._getColClass(col);
+            try {
+                const renderer = this.options.colProperties[col]?.renderer ?? null;
+                if(renderer) {
+                    td.innerHTML = renderer(item, level, col, this.options.groupOrder, this.options);
+                    return;
+                }
+                let val = "";
+                if(gData && this._getColTogglesUp(col)) val = Array.from(new Set(gData.map(r => r[col]))).join(', ');
+                else if(!gData || isLeaf) val = item[col] ?? "";
+                const fmt = this._getColFormatter(col);
+                td.innerHTML = fmt ? fmt(val, item) : val;
+            } catch(er) {
+                console.error(`DrillDowner._appendDataCells: Error rendering parked col [${col}]`, er, item);
                 td.innerHTML = '<span style="color:red" title="Render Error">⚠️</span>';
             }
         });
