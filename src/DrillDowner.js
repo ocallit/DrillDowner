@@ -139,8 +139,9 @@ class DrillDowner {
 
             const drillIcons = row.querySelectorAll('.drillDowner_drill_icon');
             drillIcons.forEach(icon => {
-                icon.classList.remove('drillDowner_drill_expanded');
-                icon.classList.add('drillDowner_drill_collapsed');
+                const isExpanded = lvl < level;
+                icon.classList.toggle('drillDowner_drill_expanded', isExpanded);
+                icon.classList.toggle('drillDowner_drill_collapsed', !isExpanded);
             });
         });
 
@@ -670,6 +671,11 @@ class DrillDowner {
         if(!this.options.availableDimensions || !this.controls) return;
         const div = this.controls.querySelector('.drillDowner_parking_area');
         if(!div) return;
+
+        if(this.activeLedgerIndex >= 0) {
+            div.innerHTML = '';
+            return;
+        }
 
         const parked = this._getParkedDimensions();
         if(parked.length === 0) {
