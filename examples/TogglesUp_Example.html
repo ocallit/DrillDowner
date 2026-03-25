@@ -10,9 +10,11 @@
 </head>
 <body>
 <h1>No togglesUp</h1>
+<div id="dd_off_controls"></div>
 <div id="dd_off"></div>
 <hr>
 <h1>TogglesUp true</h1>
+<div id="dd_on_controls"></div>
 <div id="dd_on"></div>
 <h1>Sample code</h1>
 <pre style="white-space:pre;margin:1em;padding:0.3em;border:1px blue solid;">
@@ -72,6 +74,8 @@
     // 1) togglesUp OFF: group row cells for "status" are blank
     new DrillDowner("#dd_off", data, {
         groupOrder: ["category", "product"],
+        availableDimensions: ["category", "product"],
+        controlsSelector: '#dd_off_controls',
         columns: ["status"],
         totals: ["qty"],
         colProperties: {
@@ -86,6 +90,8 @@
     // 2) togglesUp ON: group row "status" shows combined unique statuses
     new DrillDowner("#dd_on", data, {
         groupOrder: ["category", "product"],
+        availableDimensions: ["category", "product"],
+        controlsSelector: '#dd_on_controls',
         columns: ["status"],
         totals: ["qty"],
         colProperties: {
