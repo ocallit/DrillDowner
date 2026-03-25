@@ -268,8 +268,11 @@ class DrillDowner {
 
         this._renderTable();
         if(this.options.groupOrder.length > 0) {
-            this.showToLevel(0);
-            if(keepState) this._restoreExpandState(expandedHierarchies);
+            if(keepState) {
+                this._restoreExpandState(expandedHierarchies);
+            } else {
+                this.showToLevel(0);
+            }
         }
     }
 
@@ -1362,19 +1365,34 @@ class DrillDowner {
     }
 
     _restoreExpandState(expandedHierarchies) {
-        if(!expandedHierarchies.size) return;
-        // Sort by hierarchy depth so parents are expanded before children
-        const sorted = [...expandedHierarchies].sort(
-            (a, b) => JSON.parse(a).length - JSON.parse(b).length
-        );
-        sorted.forEach(h => {
-            const tr = this._findRowByHierarchy(JSON.parse(h));
+        // Single pass: compute final display state for every row without
+        // ever going through an intermediate "all collapsed" state, which
+        // would cause a visible flash on repaint.
+        this.table.querySelectorAll('tbody tr[data-level]').forEach(tr => {
+            const level = +tr.getAttribute('data-level');
+            if(level === 0) return; // level-0 rows are always visible
+
+            // A row is visible only when every ancestor is expanded.
+            // Its own hierarchy slice of length i is the hierarchy of its
+            // level-(i-1) ancestor, so we check each prefix.
+            const parsed = JSON.parse(tr.getAttribute('data-hierarchy') || '[]');
+            let visible = true;
+            for(let i = 1; i <= level; i++) {
+                if(!expandedHierarchies.has(JSON.stringify(parsed.slice(0, i)))) {
+                    visible = false;
+                    break;
+                }
+            }
+            tr.style.display = visible ? '' : 'none';
+        });
+
+        // Sync drill icon classes to match the expanded set
+        this.table.querySelectorAll('.drillDowner_drill_icon').forEach(icon => {
+            const tr = icon.closest('tr');
             if(!tr) return;
-            const icon = tr.querySelector('.drillDowner_drill_icon');
-            if(!icon || icon.classList.contains('drillDowner_drill_expanded')) return;
-            icon.classList.add('drillDowner_drill_expanded');
-            icon.classList.remove('drillDowner_drill_collapsed');
-            this._setChildrenVisible(tr.id, true);
+            const expanded = expandedHierarchies.has(tr.getAttribute('data-hierarchy'));
+            icon.classList.toggle('drillDowner_drill_expanded', expanded);
+            icon.classList.toggle('drillDowner_drill_collapsed', !expanded);
         });
     }
 
