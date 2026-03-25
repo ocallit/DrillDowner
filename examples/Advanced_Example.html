@@ -27,6 +27,7 @@
 
   new DrillDowner('#advanced-table', tx, {
     groupOrder: ["account", "month", "category"],
+    availableDimensions: ["account", "month", "category"],
     groupOrderCombinations: [
       ["account", "month", "category"],
       ["category", "account", "month"]

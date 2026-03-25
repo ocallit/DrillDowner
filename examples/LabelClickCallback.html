@@ -62,6 +62,7 @@
         // Initialize DrillDowner with the onLabelClick pattern
         const drill = new DrillDowner('#table-container', stockData, {
             groupOrder: ["Warehouse", "Category", "Product"], // The hierarchy path
+            availableDimensions: ["Warehouse", "Category", "Product"],
             columns: ["Qty"],
             controlsSelector: '#controls',
 

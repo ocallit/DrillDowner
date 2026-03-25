@@ -120,6 +120,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             const drillDowner = new DrillDowner('#table-container', sampleData, {
                 groupOrder: ["category", "brand","product","item",],
+                availableDimensions: ["category", "brand", "product", "item"],
                 columns: ["info"],
                 totals: ["price","quantity"],
                 colProperties: colProperties,

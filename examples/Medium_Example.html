@@ -26,6 +26,7 @@
 
   new DrillDowner('#medium-table', orders, {
     groupOrder: ["region", "customer", "order"],
+    availableDimensions: ["region", "customer", "order"],
     groupOrderCombinations: [
       ["region", "customer", "order"],
       ["customer", "region", "order"]

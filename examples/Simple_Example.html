@@ -9,6 +9,7 @@
 </head>
 <body>
 <h2>Simple DrillDowner Example</h2>
+<div id="simple-controls"></div>
 <div id="simple-table"></div>
 
 <script>
@@ -21,6 +22,8 @@
 
   new DrillDowner('#simple-table', data, {
     groupOrder: ["department", "product"],
+    availableDimensions: ["department", "product"],
+    controlsSelector: '#simple-controls',
     totals: ["qty", "price"],
     colProperties: {
       department: { label: "Department", icon: "🗂️" },

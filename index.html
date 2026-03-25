@@ -93,6 +93,7 @@
         <li><a href="examples/BalanceExample_2.html" style="color: var(--primary); font-weight: 500;">Balance Example 2</a> &mdash; <span style="color:#64748b">Income/expense statement with running balances that accumulate across grouped and ledger views.</span></li>
         <li><a href="examples/LedgerDrillExample.html" style="color: var(--primary); font-weight: 500;">Ledger Drill Example</a> &mdash; <span style="color:#64748b">Transaction ledger sorted latest-first with category analysis and running balance.</span></li>
         <li><a href="examples/example.html" style="color: var(--primary); font-weight: 500;">Example</a> &mdash; <span style="color:#64748b">Sales dashboard with region-to-product hierarchies, formatted currency, and status badges.</span></li>
+        <li><a href="examples/Parking_Area_Example.html" style="color: var(--primary); font-weight: 500;">Parking Area Example</a> &mdash; <span style="color:#64748b">Drag dimensions in/out of grouping, check to show parked dims as extra columns, drag to reorder them.</span></li>
     </ul>
 </div>
 
@@ -139,6 +140,7 @@
         new DrillDowner('#dd-container', salesData, {
             // Initial hierarchical grouping
             groupOrder: ["region", "country", "category", "product"],
+            availableDimensions: ["region", "country", "category", "product", "rep"],
 
             // Allow users to switch between these specific grouping views
             groupOrderCombinations: [
