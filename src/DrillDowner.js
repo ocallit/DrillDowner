@@ -238,7 +238,15 @@ class DrillDowner {
         this.container.innerHTML = '';
     }
 
-    render() {
+    render(keepState = false) {
+        let expandedHierarchies = new Set();
+        if(keepState && this.table) {
+            this.table.querySelectorAll('.drillDowner_drill_expanded').forEach(icon => {
+                const tr = icon.closest('tr');
+                if(tr) expandedHierarchies.add(tr.getAttribute('data-hierarchy'));
+            });
+        }
+
         this.grandTotals = this._calculateGrandTotals();
 
         if(this.options.groupOrder.length === 0 && this.activeLedgerIndex >= 0 && this.options.ledger[this.activeLedgerIndex]) {
@@ -261,6 +269,7 @@ class DrillDowner {
         this._renderTable();
         if(this.options.groupOrder.length > 0) {
             this.showToLevel(0);
+            if(keepState) this._restoreExpandState(expandedHierarchies);
         }
     }
 
@@ -1335,20 +1344,38 @@ class DrillDowner {
         icon.classList.toggle('drillDowner_drill_expanded', !expanded);
         icon.classList.toggle('drillDowner_drill_collapsed', expanded);
 
-        const setVisible = (pId, vis) => {
-            this.table.querySelectorAll(`tr[data-parent="${pId}"]`).forEach(r => {
-                r.style.display = vis ? '' : 'none';
-                if(!vis) {
-                    const i = r.querySelector('.drillDowner_drill_icon');
-                    if(i) {
-                        i.classList.remove('drillDowner_drill_expanded');
-                        i.classList.add('drillDowner_drill_collapsed');
-                    }
-                    setVisible(r.id, false);
+        this._setChildrenVisible(rowId, !expanded);
+    }
+
+    _setChildrenVisible(pId, vis) {
+        this.table.querySelectorAll(`tr[data-parent="${pId}"]`).forEach(r => {
+            r.style.display = vis ? '' : 'none';
+            if(!vis) {
+                const i = r.querySelector('.drillDowner_drill_icon');
+                if(i) {
+                    i.classList.remove('drillDowner_drill_expanded');
+                    i.classList.add('drillDowner_drill_collapsed');
                 }
-            });
-        };
-        setVisible(rowId, !expanded);
+                this._setChildrenVisible(r.id, false);
+            }
+        });
+    }
+
+    _restoreExpandState(expandedHierarchies) {
+        if(!expandedHierarchies.size) return;
+        // Sort by hierarchy depth so parents are expanded before children
+        const sorted = [...expandedHierarchies].sort(
+            (a, b) => JSON.parse(a).length - JSON.parse(b).length
+        );
+        sorted.forEach(h => {
+            const tr = this._findRowByHierarchy(JSON.parse(h));
+            if(!tr) return;
+            const icon = tr.querySelector('.drillDowner_drill_icon');
+            if(!icon || icon.classList.contains('drillDowner_drill_expanded')) return;
+            icon.classList.add('drillDowner_drill_expanded');
+            icon.classList.remove('drillDowner_drill_collapsed');
+            this._setChildrenVisible(tr.id, true);
+        });
     }
 
     _onAZClick() {
