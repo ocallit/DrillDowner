@@ -751,8 +751,8 @@ class DrillDowner {
             const led = this.options.ledger[this.activeLedgerIndex];
             const calcKeys = (led.sort || []).map(k => k.startsWith('-') ? k.substring(1) : k);
 
-            const calcList = [...this.dataArr];
             this._sortData(this.dataArr, led.sort);
+            const calcList = [...this.dataArr];
 
             const runningTotals = {};
             let hasInitialBalance = false;
@@ -785,9 +785,6 @@ class DrillDowner {
                 });
                 balanceMap.set(item, itemOverrides);
             });
-
-            // --- PASS 2: Render in Display Order ---
-            this._sortData(this.dataArr, led.sort);
 
             // Determine if sort is Descending (starts with '-') to place Initial Balance at Bottom
             const isDescending = (led.sort && led.sort.length > 0 && led.sort[0].startsWith('-'));
