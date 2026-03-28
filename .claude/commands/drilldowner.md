@@ -4,7 +4,7 @@ You are a DrillDowner integration expert. Your job is to understand the user's d
 
 # DrillDowner — API & Integration Reference
 
-**Version 1.2.4 · Zero dependencies · ES6 · Vanilla JS**
+**Version 1.2.5 · Zero dependencies · ES6 · Vanilla JS**
 
 ---
 

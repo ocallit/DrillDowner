@@ -1,6 +1,6 @@
 /* jshint esversion:11 */
 class DrillDowner {
-    static version = '1.2.4';
+    static version = '1.2.5';
 
     constructor(container, dataArr, options = {}) {
         this.container = typeof container === 'string' ? document.querySelector(container) : container;
@@ -43,7 +43,7 @@ class DrillDowner {
 
         // Parked-dimensions feature state
         this._parkedEnabled = new Set(); // keys of parked dims whose checkbox is checked (shown as columns)
-        this._parkedOrder   = this.options.availableDimensions ? [...this.options.availableDimensions] : [];
+        this._parkedOrder = this.options.availableDimensions ? [...this.options.availableDimensions] : [];
 
         this.azBar = this.options.azBarSelector ? (typeof this.options.azBarSelector === 'string' ?
             document.querySelector(this.options.azBarSelector) : this.options.azBarSelector) : null;
@@ -383,17 +383,17 @@ class DrillDowner {
         const self = this;
 
         this.controls.addEventListener('dragstart', (e) => {
-            const navBtn  = e.target.closest('.drillDowner_breadcrumb_item[data-level]');
+            const navBtn = e.target.closest('.drillDowner_breadcrumb_item[data-level]');
             const parkBtn = e.target.closest('.drillDowner_parking_item[data-dim]');
             if(navBtn) {
                 self._h5Zone = 'nav';
-                self._h5Idx  = parseInt(navBtn.dataset.level);
+                self._h5Idx = parseInt(navBtn.dataset.level);
                 e.dataTransfer.effectAllowed = 'move';
                 e.dataTransfer.setData('text/plain', `nav:${navBtn.dataset.level}`);
                 setTimeout(() => navBtn.classList.add('drillDowner_dragging'), 0);
             } else if(parkBtn) {
                 self._h5Zone = 'parking';
-                self._h5Dim  = parkBtn.dataset.dim;
+                self._h5Dim = parkBtn.dataset.dim;
                 e.dataTransfer.effectAllowed = 'move';
                 e.dataTransfer.setData('text/plain', `parking:${parkBtn.dataset.dim}`);
                 setTimeout(() => parkBtn.classList.add('drillDowner_dragging'), 0);
@@ -409,8 +409,8 @@ class DrillDowner {
         this.controls.addEventListener('dragover', (e) => {
             if(!self._h5Zone) return;
             if(e.target.closest('.drillDowner_breadcrumb_item[data-level]') ||
-               e.target.closest('.drillDowner_breadcrumb_nav') ||
-               e.target.closest('.drillDowner_parking_area')) {
+                e.target.closest('.drillDowner_breadcrumb_nav') ||
+                e.target.closest('.drillDowner_parking_area')) {
                 e.preventDefault();
                 e.dataTransfer.dropEffect = 'move';
             }
@@ -421,10 +421,10 @@ class DrillDowner {
             self.controls.querySelectorAll('.drillDowner_drag_over')
                 .forEach(el => el.classList.remove('drillDowner_drag_over'));
 
-            const navBtn   = e.target.closest('.drillDowner_breadcrumb_item[data-level]');
+            const navBtn = e.target.closest('.drillDowner_breadcrumb_item[data-level]');
             const parkItem = !navBtn && e.target.closest('.drillDowner_parking_item[data-dim]');
             const parkArea = !navBtn && !parkItem && e.target.closest('.drillDowner_parking_area');
-            const navArea  = !navBtn && e.target.closest('.drillDowner_breadcrumb_nav');
+            const navArea = !navBtn && e.target.closest('.drillDowner_breadcrumb_nav');
 
             if(navBtn) {
                 const isSelf = self._h5Zone === 'nav' && parseInt(navBtn.dataset.level) === self._h5Idx;
@@ -449,10 +449,10 @@ class DrillDowner {
             self.controls.querySelectorAll('.drillDowner_dragging,.drillDowner_drag_over')
                 .forEach(el => el.classList.remove('drillDowner_dragging', 'drillDowner_drag_over'));
 
-            const navBtn   = e.target.closest('.drillDowner_breadcrumb_item[data-level]');
+            const navBtn = e.target.closest('.drillDowner_breadcrumb_item[data-level]');
             const parkItem = !navBtn && e.target.closest('.drillDowner_parking_item[data-dim]');
             const parkArea = !navBtn && !parkItem && e.target.closest('.drillDowner_parking_area');
-            const navArea  = !navBtn && e.target.closest('.drillDowner_breadcrumb_nav');
+            const navArea = !navBtn && e.target.closest('.drillDowner_breadcrumb_nav');
 
             if(self._h5Zone === 'nav') {
                 const fromIdx = self._h5Idx;
@@ -477,9 +477,9 @@ class DrillDowner {
                     self._applyNewGroupOrder([...self.options.groupOrder, dim]);
                 } else if(parkItem && parkItem.dataset.dim !== dim) {
                     // Reorder parked items
-                    const toDim   = parkItem.dataset.dim;
+                    const toDim = parkItem.dataset.dim;
                     const fromIdx = self._parkedOrder.indexOf(dim);
-                    const toIdx   = self._parkedOrder.indexOf(toDim);
+                    const toIdx = self._parkedOrder.indexOf(toDim);
                     if(fromIdx !== -1 && toIdx !== -1) {
                         self._parkedOrder = self._reorderArray(self._parkedOrder, fromIdx, toIdx);
                         self._renderParkingArea();
@@ -501,9 +501,11 @@ class DrillDowner {
                 if(e.target.closest('input[type=checkbox]')) return; // let checkbox handle its own touch
                 if(e.touches.length !== 1) return;
                 const t = e.touches[0];
-                ts = { startX: t.clientX, startY: t.clientY, dragging: false,
-                       targetType: null, target: null };
-            }, { passive: true });
+                ts = {
+                    startX: t.clientX, startY: t.clientY, dragging: false,
+                    targetType: null, target: null
+                };
+            }, {passive: true});
 
             el.addEventListener('touchmove', (e) => {
                 if(!ts) return;
@@ -516,35 +518,41 @@ class DrillDowner {
                 if(!ts.dragging) return;
                 e.preventDefault();
 
-                const pt       = document.elementFromPoint(t.clientX, t.clientY);
-                const navBtn   = pt && pt.closest('.drillDowner_breadcrumb_item[data-level]');
+                const pt = document.elementFromPoint(t.clientX, t.clientY);
+                const navBtn = pt && pt.closest('.drillDowner_breadcrumb_item[data-level]');
                 const parkItem = pt && !navBtn && pt.closest('.drillDowner_parking_item[data-dim]');
                 const parkArea = pt && !navBtn && !parkItem && pt.closest('.drillDowner_parking_area');
-                const navArea  = !navBtn && pt && pt.closest('.drillDowner_breadcrumb_nav');
+                const navArea = !navBtn && pt && pt.closest('.drillDowner_breadcrumb_nav');
 
                 if(self.controls) self.controls.querySelectorAll('.drillDowner_drag_over')
                     .forEach(b => b.classList.remove('drillDowner_drag_over'));
 
                 if(navBtn && navBtn !== el) {
                     navBtn.classList.add('drillDowner_drag_over');
-                    ts.targetType = 'navBtn'; ts.target = navBtn;
+                    ts.targetType = 'navBtn';
+                    ts.target = navBtn;
                 } else if(parkItem && parkItem !== el) {
                     parkItem.classList.add('drillDowner_drag_over');
-                    ts.targetType = 'parkItem'; ts.target = parkItem;
+                    ts.targetType = 'parkItem';
+                    ts.target = parkItem;
                 } else if(parkArea && !parkArea.contains(el)) {
                     parkArea.classList.add('drillDowner_drag_over');
-                    ts.targetType = 'parkArea'; ts.target = parkArea;
+                    ts.targetType = 'parkArea';
+                    ts.target = parkArea;
                 } else if(navArea && !navArea.contains(el)) {
                     navArea.classList.add('drillDowner_drag_over');
-                    ts.targetType = 'navArea'; ts.target = navArea;
+                    ts.targetType = 'navArea';
+                    ts.target = navArea;
                 } else {
-                    ts.targetType = null; ts.target = null;
+                    ts.targetType = null;
+                    ts.target = null;
                 }
-            }, { passive: false });
+            }, {passive: false});
 
             el.addEventListener('touchend', (e) => {
                 if(!ts) return;
-                const state = ts; ts = null;
+                const state = ts;
+                ts = null;
                 el.classList.remove('drillDowner_dragging');
                 if(self.controls) self.controls.querySelectorAll('.drillDowner_drag_over')
                     .forEach(b => b.classList.remove('drillDowner_drag_over'));
@@ -575,9 +583,9 @@ class DrillDowner {
                         self._applyNewGroupOrder([...self.options.groupOrder, dim]);
                     } else if(state.targetType === 'parkItem' && state.target.dataset.dim !== dim) {
                         // Reorder parked items
-                        const toDim   = state.target.dataset.dim;
+                        const toDim = state.target.dataset.dim;
                         const fromIdx = self._parkedOrder.indexOf(dim);
-                        const toIdx   = self._parkedOrder.indexOf(toDim);
+                        const toIdx = self._parkedOrder.indexOf(toDim);
                         if(fromIdx !== -1 && toIdx !== -1) {
                             self._parkedOrder = self._reorderArray(self._parkedOrder, fromIdx, toIdx);
                             self._renderParkingArea();
@@ -588,7 +596,8 @@ class DrillDowner {
             });
 
             el.addEventListener('touchcancel', () => {
-                if(!ts) return; ts = null;
+                if(!ts) return;
+                ts = null;
                 el.classList.remove('drillDowner_dragging');
                 if(self.controls) self.controls.querySelectorAll('.drillDowner_drag_over')
                     .forEach(b => b.classList.remove('drillDowner_drag_over'));
@@ -749,19 +758,31 @@ class DrillDowner {
         // --- LEDGER VIEW (FLAT) ---
         if(this.options.groupOrder.length === 0 && this.activeLedgerIndex >= 0) {
             const led = this.options.ledger[this.activeLedgerIndex];
-            const calcKeys = (led.sort || []).map(k => k.startsWith('-') ? k.substring(1) : k);
 
-            this._sortData(this.dataArr, led.sort);
-            const calcList = [...this.dataArr];
+            // Determine calc and view sort orders independently.
+            // calcSort: order for accumulating running totals (should be ascending/chronological).
+            // viewSort: order for display (may be descending).
+            // If only one is supplied, the other is derived from it.
+            // If neither is supplied, no sorting is applied.
+            let calcSort, viewSort;
+            if(led.calcSort || led.viewSort) {
+                calcSort = led.calcSort || led.viewSort.map(k => k.startsWith('-') ? k.substring(1) : k);
+                viewSort = led.viewSort || led.calcSort;
+            } else if(led.sort) {
+                calcSort = viewSort = led.sort;
+            }
+
+            // Pass 1: accumulate running totals in calcSort order
+            if(calcSort) this._sortData(this.dataArr, calcSort);
 
             const runningTotals = {};
             let hasInitialBalance = false;
 
             this.options.totals.forEach(col => {
                 const props = this._getColProperty(col, 'balanceBehavior');
-                if (props) {
+                if(props) {
                     runningTotals[col] = (typeof props.initialBalance === 'number') ? props.initialBalance : 0;
-                    if (typeof props.initialBalance === 'number') hasInitialBalance = true;
+                    if(typeof props.initialBalance === 'number') hasInitialBalance = true;
                 } else {
                     runningTotals[col] = 0;
                 }
@@ -769,41 +790,26 @@ class DrillDowner {
 
             const balanceMap = new Map();
 
-            calcList.forEach(item => {
+            this.dataArr.forEach(item => {
                 const itemOverrides = {};
                 this.options.totals.forEach(col => {
                     const props = this._getColProperty(col, 'balanceBehavior');
-                    if (props) {
+                    if(props) {
                         const impact = this._calculateRowImpact(item, col);
                         runningTotals[col] += impact;
                         itemOverrides[col] = runningTotals[col];
                     } else {
-                        // For normal totals without balanceBehavior, maybe accumulate them too?
-                        // But for now, keep original behavior
                         itemOverrides[col] = item[col];
                     }
                 });
                 balanceMap.set(item, itemOverrides);
             });
 
-            // Determine if sort is Descending (starts with '-') to place Initial Balance at Bottom
-            const isDescending = (led.sort && led.sort.length > 0 && led.sort[0].startsWith('-'));
+            // Pass 2: re-sort into display order
+            if(viewSort) this._sortData(this.dataArr, viewSort);
 
-            // When descending, reverse within-key groups so the item with the highest running
-            // balance (accumulated last in Pass 1) appears first within each same-key bucket.
-            if(isDescending && calcKeys.length > 0) {
-                const pk = calcKeys[0];
-                let i = 0;
-                while(i < this.dataArr.length) {
-                    let j = i + 1;
-                    while(j < this.dataArr.length &&
-                    String(this.dataArr[j][pk] || '') === String(this.dataArr[i][pk] || '')) {
-                        j++;
-                    }
-                    if(j - i > 1) this.dataArr.splice(i, j - i, ...this.dataArr.slice(i, j).reverse());
-                    i = j;
-                }
-            }
+            // Determine if display is Descending to place Initial Balance row at bottom
+            const isDescending = (viewSort && viewSort.length > 0 && viewSort[0].startsWith('-'));
 
             // --- Helper to Render Initial Balance Row ---
             const renderInitialRow = () => {

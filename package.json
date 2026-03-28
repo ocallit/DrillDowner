@@ -1,6 +1,6 @@
 {
   "name": "drilldowner",
-  "version": "1.2.4",
+  "version": "1.2.5",
   "description": "A simple JavaScript library for hierarchical data tables with drill-down functionality.",
   "main": "dist/DrillDowner.min.js",
   "repository": {
