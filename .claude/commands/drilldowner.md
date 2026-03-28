@@ -234,6 +234,13 @@ ledger: [
     label: "Newest First",
     cols: ["date", "description", "amount"],
     sort: ["-date"]                              // '-date' = descending by date
+  },
+  // calcSort/viewSort: accumulate balance oldest→newest, display newest→oldest
+  {
+    label: "Latest First (correct balance)",
+    cols: ["date", "description", "deposit", "withdrawal", "balance"],
+    calcSort: ["date"],    // order for running-balance accumulation (always ascending)
+    viewSort: ["-date"]    // order for display
   }
 ]
 ```
@@ -243,6 +250,18 @@ ledger: [
 A single object (not in an array) is also accepted and auto-wrapped.
 
 **Starting in ledger mode:** set `groupOrder: []` and define at least one `ledger` entry. The first ledger entry is shown on initial load.
+
+#### `calcSort` and `viewSort` — separate sort orders for balance vs. display
+
+Use these instead of `sort` when the running-balance accumulation order differs from the desired display order. The classic use case is a bank statement shown newest-first: you still need to accumulate the balance oldest-first.
+
+| Property | Purpose |
+|----------|---------|
+| `sort` | Single sort for both calculation and display |
+| `calcSort` | Sort for accumulation only. Omit to derive from `viewSort` (strips `-`). |
+| `viewSort` | Sort for display. Omit to use `calcSort` unchanged. |
+
+The `initialBalance` row (from `balanceBehavior.initialBalance`) is placed at the **top** when `viewSort` is ascending and at the **bottom** when `viewSort` is descending.
 
 ---
 
@@ -485,7 +504,7 @@ colProperties: {
 }
 ```
 
-### `DrillDowner.version` → `"1.2.2"`
+### `DrillDowner.version` → `"1.2.6"`
 
 ---
 
@@ -670,6 +689,12 @@ const dd = new DrillDowner('#table', transactions, {
       label: "Newest First",
       cols:  ["date", "description", "deposit", "withdrawal", "balance"],
       sort:  ["-date"]  // descending: newest first, initial balance at bottom
+    },
+    {
+      label: "Latest First (correct balance)",
+      cols:  ["date", "description", "deposit", "withdrawal", "balance"],
+      calcSort: ["date"],    // accumulate oldest→newest
+      viewSort: ["-date"]    // display newest→oldest
     }
   ],
   totals: ["deposit", "withdrawal", "balance"],

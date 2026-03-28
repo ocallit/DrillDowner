@@ -1,6 +1,6 @@
 # DrillDowner — API Reference
 
-**Version 1.2.2 · Zero dependencies · ES6 · Vanilla JS**
+**Version 1.2.6 · Zero dependencies · ES6 · Vanilla JS**
 
 ---
 
@@ -211,6 +211,46 @@ ledger: [
 - `cols` controls column order. Any `totals` not in `cols` are appended at the end.
 - Top-level `columns` is ignored in ledger mode.
 - Set `groupOrder: []` to start in ledger mode (first ledger entry shown on load).
+
+#### `calcSort` and `viewSort` — separate sort orders for balance vs. display
+
+When a ledger entry has a `balanceBehavior` column, DrillDowner needs two sort orders: one to accumulate the running balance chronologically and another to display rows in the user's preferred order. Use `calcSort` and `viewSort` instead of `sort` when these differ.
+
+```javascript
+ledger: [
+  {
+    label: "Latest First",
+    cols:  ["date", "description", "deposit", "withdrawal", "balance"],
+    calcSort: ["date"],       // Accumulate oldest→newest (always ascending)
+    viewSort: ["-date"]       // Display newest→oldest
+  }
+]
+```
+
+| Property | Purpose | Default |
+|----------|---------|---------|
+| `sort` | Single sort used for both calculation and display | — |
+| `calcSort` | Sort order for running-balance accumulation | Derived from `viewSort` (strip `-`) if omitted |
+| `viewSort` | Sort order for display | Same as `calcSort` if omitted |
+
+- If only `calcSort` is provided, `viewSort` defaults to the same order.
+- If only `viewSort` is provided, `calcSort` is derived by stripping `-` prefixes (ascending).
+- If neither is provided, `sort` is used for both. If `sort` is also absent, data renders in original array order.
+
+**Example — bank statement newest-first with correct balance:**
+
+```javascript
+ledger: [
+  {
+    label: "Newest First",
+    cols:  ["date", "description", "deposit", "withdrawal", "balance"],
+    calcSort: ["date", "id"],    // accumulate oldest→newest
+    viewSort: ["-date", "-id"]   // display newest→oldest
+  }
+]
+```
+
+The `initialBalance` row is placed at the **top** for ascending `viewSort` and at the **bottom** for descending `viewSort`.
 
 ---
 
@@ -460,7 +500,7 @@ colProperties: {
 }
 ```
 
-### `DrillDowner.version` → `"1.2.2"`
+### `DrillDowner.version` → `"1.2.6"`
 
 ---
 
@@ -636,8 +676,10 @@ const transactions = [
 const dd = new DrillDowner('#table', transactions, {
   groupOrder: [],
   ledger: [
-    { label: "Chronological", cols: ["date", "description", "deposit", "withdrawal", "balance"], sort: ["date"] },
-    { label: "Newest First",  cols: ["date", "description", "deposit", "withdrawal", "balance"], sort: ["-date"] }
+    { label: "Chronological",  cols: ["date", "description", "deposit", "withdrawal", "balance"], sort: ["date"] },
+    { label: "Newest First",   cols: ["date", "description", "deposit", "withdrawal", "balance"], sort: ["-date"] },
+    { label: "Latest (correct balance)", cols: ["date", "description", "deposit", "withdrawal", "balance"],
+      calcSort: ["date"], viewSort: ["-date"] }
   ],
   totals: ["deposit", "withdrawal", "balance"],
   colProperties: {

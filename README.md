@@ -1,6 +1,6 @@
 # DrillDowner
 
-**Version 1.2.2 · Zero dependencies · ES6 · Vanilla JS**
+**Version 1.2.6 · Zero dependencies · ES6 · Vanilla JS**
 
 DrillDowner turns a flat array of objects into an interactive drill-down table with collapsible hierarchy, subtotals, flexible grouping, and optional flat "ledger" views — all with no dependencies and no build step required.
 
@@ -120,8 +120,13 @@ colProperties: {
 const dd = new DrillDowner('#table', transactions, {
   groupOrder: [],
   ledger: [
+    // sort: ascending — oldest first, Initial Balance row at top
     { label: "Chronological", cols: ["date", "desc", "deposit", "withdrawal", "balance"], sort: ["date"] },
-    { label: "Newest First",  cols: ["date", "desc", "deposit", "withdrawal", "balance"], sort: ["-date"] }
+    // sort: descending — newest first, Initial Balance row at bottom
+    { label: "Newest First",  cols: ["date", "desc", "deposit", "withdrawal", "balance"], sort: ["-date"] },
+    // calcSort/viewSort: accumulate oldest-to-newest, display newest-to-oldest
+    { label: "Latest First (correct balance)", cols: ["date", "desc", "deposit", "withdrawal", "balance"],
+      calcSort: ["date"], viewSort: ["-date"] }
   ],
   totals: ["deposit", "withdrawal", "balance"],
   colProperties: {
@@ -225,7 +230,7 @@ const dd = new DrillDowner(container, dataArr, options)
 |--------|-------------|
 | `DrillDowner.formatNumber(n, decimals)` | `1234567.8, 2` → `"1,234,567.80"` |
 | `DrillDowner.formatDate(value, includeTime)` | `"2024-03-15"` → `"15/Mar/24"` |
-| `DrillDowner.version` | `"1.2.2"` |
+| `DrillDowner.version` | `"1.2.6"` |
 
 ### Public properties
 
