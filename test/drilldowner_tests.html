@@ -127,6 +127,199 @@
     };
 
     // QUnit Tests
+    QUnit.module('DrillDowner stricter tests', function() {
+        QUnit.test('Totals are calculated correctly (Strict)', function(assert) {
+            const container = '#test-container';
+            const dd = new DrillDowner(container, testData, {
+                groupOrder: ["p"],
+                totals: ["rolls"]
+            });
+
+            // 1. Calculate the exact expected grand total manually from the raw data
+            const exactExpectedTotal = testData.reduce((sum, item) => sum + item.rolls, 0);
+
+            // 2. Fetch the exact cell that should contain this total
+            const grandTotalCell = document.querySelector(container + ' tfoot td.drillDowner_num');
+
+            // 3. Format the expected number exactly as the widget should format it
+            const expectedFormattedString = DrillDowner.formatNumber(exactExpectedTotal, 2);
+
+            // 4. Assert exact equality, no vague includes or type checking
+            assert.strictEqual(
+                grandTotalCell.textContent.trim(),
+                expectedFormattedString,
+                `Grand total must exactly match the sum of rolls formatted to 2 decimals (${expectedFormattedString})`
+            );
+
+            dd.destroy();
+        });
+        QUnit.test('Ledger Mode: Exact Column Order and Sorting', function(assert) {
+            const container = '#test-container';
+            const dd = new DrillDowner(container, [...testData], {
+                groupOrder: [],
+                ledger: [{
+                    label: "Cardex View",
+                    cols: ["c", "p"], // Color, then Product
+                    sort: ["c", "p"]
+                }],
+                totals: ["rolls"]
+            });
+
+            // 1. Target the exact first row
+            const firstDataRow = document.querySelector(container + ' tbody tr:first-child');
+            const cells = firstDataRow.querySelectorAll('td');
+
+            // 2. Assert exact cell count (Indent cell + 2 cols + 1 total = 4 cells)
+            assert.strictEqual(cells.length, 4, "Ledger row must have exactly 4 cells (Indent, Color, Product, Rolls)");
+
+            // 3. Assert exact values in exact positions based on the configured sort order
+            // 'Amarillo' should be the first color alphabetically.
+            assert.strictEqual(cells[1].textContent.trim(), "Amarillo", "Column 1 (Color) must exactly equal 'Amarillo'");
+            assert.strictEqual(cells[2].textContent.trim(), "Delta", "Column 2 (Product) must exactly equal 'Delta'");
+
+            dd.destroy();
+        });
+        QUnit.test('Breadcrumb clicks work: Strict Visibility State', function(assert) {
+            const container = '#test-container';
+            const controls = '#test-controls';
+
+            const dd = new DrillDowner(container, testData, {
+                groupOrder: ["p", "c", "w"],
+                controlsSelector: controls
+            });
+
+            const level1Breadcrumb = document.querySelector(controls + ' .drillDowner_breadcrumb_item[data-level="1"]');
+            level1Breadcrumb.click();
+
+            // 1. Count exact expected visible rows manually based on testData structure
+            const level0Count = new Set(testData.map(d => d.p)).size; // Unique Products
+            const level1Count = new Set(testData.map(d => d.p + '_' + d.c)).size; // Unique Product+Color combinations
+            const expectedVisibleCount = level0Count + level1Count;
+
+            // 2. Count actual visible rows
+            const actualVisibleRows = Array.from(document.querySelectorAll(container + ' tbody tr'))
+                .filter(row => window.getComputedStyle(row).display !== 'none').length;
+
+            // 3. Assert exact match
+            assert.strictEqual(
+                actualVisibleRows,
+                expectedVisibleCount,
+                `Clicking level 1 breadcrumb must show exactly ${expectedVisibleCount} rows (Level 0 + Level 1). No more, no less.`
+            );
+
+            dd.destroy();
+        });
+        QUnit.test('Data Mutation: strict re-rendering of hierarchy', function(assert) {
+            const container = '#test-container';
+            const modifiableData = [...testData.slice(0, 3)]; // Alpha/Rojo only
+
+            const dd = new DrillDowner(container, modifiableData, {
+                groupOrder: ["p", "c"], // Group by Product -> Color
+            });
+
+            // Add a new product that didn't exist before
+            modifiableData.push({p: "Epsilon", c: "Morado", rolls: 5});
+            dd.render();
+
+            // 1. Verify the Level 0 (Product) row was created correctly.
+            // Use the exact data-hierarchy attribute JSON that DrillDowner uses to track paths.
+            const epsilonLevel0Row = document.querySelector(container + ' tr[data-hierarchy=\'["Epsilon"]\']');
+
+            assert.ok(epsilonLevel0Row !== null, "A new Level 0 row for exactly 'Epsilon' must be generated");
+
+            // 2. Verify the child relationship is established via data-parent ID
+            const moradoLevel1Row = document.querySelector(container + ' tr[data-hierarchy=\'["Epsilon","Morado"]\']');
+
+            assert.ok(moradoLevel1Row !== null, "A Level 1 child row for 'Morado' must be generated");
+
+            assert.strictEqual(
+                moradoLevel1Row.getAttribute('data-parent'),
+                epsilonLevel0Row.id,
+                "The child row must be exactly linked to the new Epsilon parent row ID"
+            );
+
+            dd.destroy();
+        });
+    });
+    QUnit.module('Formatters', function() {
+        QUnit.test('Static formatNumber formats numbers with correct decimals and thousands separators', function(assert) {
+            // Basic formatting
+            assert.equal(DrillDowner.formatNumber(1234.567, 2), '1,234.57', 'Rounds and adds comma separator');
+            assert.equal(DrillDowner.formatNumber(1234.5, 2), '1,234.50', 'Pads decimals to 2 places');
+
+            // Negative numbers
+            assert.equal(DrillDowner.formatNumber(-1234.567, 2), '-1,234.57', 'Negative number formatted with sign');
+
+            // Zero
+            assert.equal(DrillDowner.formatNumber(0, 2), '0.00', 'Zero formatted with decimals');
+
+            // No decimals
+            assert.equal(DrillDowner.formatNumber(1234.567, 0), '1,235', 'Rounds to nearest integer when decimals=0');
+
+            // Large numbers
+            assert.equal(DrillDowner.formatNumber(1000000.5, 2), '1,000,000.50', 'Large numbers get proper comma separators');
+
+            // Numbers less than 1000
+            assert.equal(DrillDowner.formatNumber(99.9, 2), '99.90', 'Small numbers formatted correctly');
+
+            // Edge case: NaN
+            assert.equal(DrillDowner.formatNumber(NaN, 2), "", 'NaN input returns ""');
+
+            // Edge case: null/undefined
+            assert.equal(DrillDowner.formatNumber(null, 2), '', 'Null returns empty string');
+            assert.equal(DrillDowner.formatNumber(undefined, 2), '', 'Undefined returns empty string');
+
+            // Empty string
+            assert.equal(DrillDowner.formatNumber('', 2), '', 'Empty string returns empty string');
+        });
+
+        QUnit.test('Static formatDate handles various input formats correctly', function(assert) {
+            // Test 1: Date object (specific date)
+            const dateObj = new Date(2025, 2, 15, 12, 0, 0);
+            const result1 = DrillDowner.formatDate(dateObj, false);
+            assert.equal(result1, '15/Mar/25', 'Date object formatted as DD/MMM/YY');
+
+            // Test 2: Date string in YYYY-MM-DD format
+            const result2 = DrillDowner.formatDate('2025-03-15', false);
+            assert.equal(result2, '15/Mar/25', 'Date string YYYY-MM-DD formatted correctly');
+
+            // Test 3: Date string with time component (should ignore time when includeTime=false)
+            const result3 = DrillDowner.formatDate('2025-03-15T14:30:00', false);
+            assert.equal(result3, '15/Mar/25', 'Date string with time, time ignored when includeTime=false');
+
+            // Test 4: Date string WITH time component and includeTime=true
+            const result4 = DrillDowner.formatDate('2025-03-15T14:30:00', true);
+            assert.equal(result4, '15/Mar/25 14:30', 'Date string with time and includeTime=true includes time');
+
+            // Test 5: Null/undefined returns empty string
+            assert.equal(DrillDowner.formatDate(null, false), '', 'Null returns empty string');
+            assert.equal(DrillDowner.formatDate(undefined, false), '', 'Undefined returns empty string');
+
+            // Test 6: Invalid date object
+            const invalidDate = new Date('invalid');
+            assert.equal(DrillDowner.formatDate(invalidDate, false), '', 'Invalid date returns empty string');
+
+            // Test 7: Edge case - month 12 (December)
+            const result7 = DrillDowner.formatDate('2025-12-25', false);
+            assert.equal(result7, '25/Dec/25', 'December formatted correctly');
+
+            // Test 8: Edge case - January (month 01)
+            const result8 = DrillDowner.formatDate('2025-01-01', false);
+            assert.equal(result8, '01/Jan/25', 'January formatted correctly');
+
+            // Test 9: Edge case - invalid month (00) fallback
+            const result9 = DrillDowner.formatDate('2025-00-15', false);
+            assert.equal(result9, '15/??/25', 'Invalid month (00) shows ?? as fallback');
+
+            // Test 10: Random string that's not a date
+            assert.equal(DrillDowner.formatDate('not-a-date', false), 'not-a-date', 'Non-date string returned as-is');
+        });
+    });
+
+
+
+
+
     QUnit.module('DrillDowner Initialization', function() {
         QUnit.test('Basic initialization with minimal options', function(assert) {
             const container = '#test-container';
