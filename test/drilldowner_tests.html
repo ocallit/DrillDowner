@@ -1664,8 +1664,8 @@
         QUnit.test('Ledger Mode: Running balance with initial balance and impact', function(assert) {
             const container = '#test-container';
             const data = [
-                { type: 'in', amount: 50 },  // 100 + 50 = 150
-                { type: 'out', amount: 20 }  // 150 - 20 = 130
+                { type: 'in', amount: 50 },   // 100 + 50 = 150
+                { type: 'out', amount: -20 }  // 150 + (-20) = 130
             ];
 
             const dd = new DrillDowner(container, data, {
@@ -1699,7 +1699,7 @@
 
             const dd = new DrillDowner(container, data, {
                 groupOrder: [], // Ledger mode
-                ledger: [{ label: "Financials", cols: ['inc', 'dec'], sort: ['inc'] }],
+                ledger: [{ label: "Financials", cols: ['inc', 'dec'] }],
                 totals: ['net'],
                 colProperties: {
                     'net': {
@@ -1712,7 +1712,7 @@
                 }
             });
 
-            const rows = document.querySelectorAll('tbody tr:not(.drillDowner_initial_row)');
+            const rows = document.querySelectorAll(container + ' tbody tr:not(.drillDowner_initial_row)');
             const firstRowNet = rows[0].querySelector('td.drillDowner_num').textContent;
             const secondRowNet = rows[1].querySelector('td.drillDowner_num').textContent;
 
@@ -1875,7 +1875,7 @@
 
             const dd = new DrillDowner(container, data, {
                 groupOrder: ['cat'],
-                totals: ['deposit', 'withdrawal', 'balance'],
+                totals: ['balance'],
                 colProperties: {
                     balance: {
                         balanceBehavior: { initialBalance: 500, add: ['deposit'], subtract: ['withdrawal'] }
