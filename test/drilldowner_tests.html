@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DrillDowner QUnit 1.2.2</title>
+    <title>DrillDowner QUnit 1.2.6</title>
 
     <!-- QUnit CSS and JS -->
     <link rel="stylesheet" href="../tools/qunit-2.24.1.css">
@@ -1719,6 +1719,177 @@
             assert.equal(firstRowNet, '1,080.00', "Running balance adds and subtracts correctly");
             assert.equal(secondRowNet, '1,030.00', "Running balance persists correctly to next row");
             assert.equal(dd.grandTotals.net, 1030, "Grand total matches the final running balance");
+
+            dd.destroy();
+        });
+
+        QUnit.test('calcSort + viewSort: balance accumulates ascending, displays descending', function(assert) {
+            const container = '#test-container';
+            document.querySelector(container).innerHTML = '';
+            // Three transactions in chronological order
+            const data = [
+                { date: '2024-01-01', amount: 100 },  // balance after: 1100
+                { date: '2024-01-02', amount: 200 },  // balance after: 1300
+                { date: '2024-01-03', amount:  50 }   // balance after: 1350
+            ];
+
+            const dd = new DrillDowner(container, data, {
+                groupOrder: [],
+                ledger: [{
+                    label: 'Latest First',
+                    cols: ['date', 'amount', 'balance'],
+                    calcSort: ['date'],      // accumulate oldest→newest
+                    viewSort: ['-date']      // display newest→oldest
+                }],
+                totals: ['amount', 'balance'],
+                colProperties: {
+                    balance: {
+                        balanceBehavior: { initialBalance: 1000, add: ['amount'], subtract: [] }
+                    }
+                }
+            });
+
+            const rows = Array.from(document.querySelectorAll(container + ' tbody tr:not(.drillDowner_initial_row)'));
+            assert.equal(rows.length, 3, 'Three data rows rendered');
+            // Display is newest-first: 2024-01-03 (1350), 2024-01-02 (1300), 2024-01-01 (1100)
+            const balances = rows.map(r => r.querySelector('td.drillDowner_num:last-child').textContent.trim());
+            assert.equal(balances[0], '1,350.00', 'Newest row shows highest balance (1350)');
+            assert.equal(balances[1], '1,300.00', 'Middle row shows 1300');
+            assert.equal(balances[2], '1,100.00', 'Oldest row shows 1100');
+
+            // Initial Balance row must be at the BOTTOM because viewSort is descending
+            const allRows = Array.from(document.querySelectorAll(container + ' tbody tr'));
+            const lastRow = allRows[allRows.length - 1];
+            assert.ok(lastRow.classList.contains('drillDowner_initial_row'), 'Initial Balance row is at the bottom for descending viewSort');
+
+            dd.destroy();
+        });
+
+        QUnit.test('calcSort only: viewSort defaults to same ascending order', function(assert) {
+            const container = '#test-container';
+            document.querySelector(container).innerHTML = '';
+            const data = [
+                { seq: 3, val: 30 },
+                { seq: 1, val: 10 },
+                { seq: 2, val: 20 }
+            ];
+
+            const dd = new DrillDowner(container, data, {
+                groupOrder: [],
+                ledger: [{
+                    label: 'Calc Only',
+                    cols: ['seq', 'val', 'bal'],
+                    calcSort: ['seq']   // viewSort should default to ['seq'] (ascending)
+                }],
+                totals: ['val', 'bal'],
+                colProperties: {
+                    bal: { balanceBehavior: { initialBalance: 0, add: ['val'], subtract: [] } }
+                }
+            });
+
+            const rows = Array.from(document.querySelectorAll(container + ' tbody tr:not(.drillDowner_initial_row)'));
+            const seqs = rows.map(r => r.querySelector('td:nth-child(2)').textContent.trim());
+            assert.deepEqual(seqs, ['1', '2', '3'], 'Rows displayed in ascending order when only calcSort is set');
+
+            dd.destroy();
+        });
+
+        QUnit.test('viewSort only: calcSort derived as ascending', function(assert) {
+            const container = '#test-container';
+            document.querySelector(container).innerHTML = '';
+            const data = [
+                { seq: 1, val: 10 },
+                { seq: 3, val: 30 },
+                { seq: 2, val: 20 }
+            ];
+
+            const dd = new DrillDowner(container, data, {
+                groupOrder: [],
+                ledger: [{
+                    label: 'View Only',
+                    cols: ['seq', 'val', 'bal'],
+                    viewSort: ['-seq']   // descending display; calcSort derived as ['seq']
+                }],
+                totals: ['val', 'bal'],
+                colProperties: {
+                    bal: { balanceBehavior: { initialBalance: 0, add: ['val'], subtract: [] } }
+                }
+            });
+
+            const rows = Array.from(document.querySelectorAll(container + ' tbody tr:not(.drillDowner_initial_row)'));
+            // Display should be descending: seq 3, 2, 1
+            const seqs = rows.map(r => r.querySelector('td:nth-child(2)').textContent.trim());
+            assert.deepEqual(seqs, ['3', '2', '1'], 'Rows displayed in descending order per viewSort');
+            // Balance accumulates ascending (seq 1→2→3: 10, 30, 60); display order shows 60, 30, 10
+            const bals = rows.map(r => r.querySelector('td.drillDowner_num:last-child').textContent.trim());
+            assert.equal(bals[0], '60.00', 'seq=3 row shows balance 60 (10+20+30)');
+            assert.equal(bals[2], '10.00', 'seq=1 row shows balance 10');
+
+            dd.destroy();
+        });
+
+        QUnit.test('Initial Balance row: ascending sort places it at top', function(assert) {
+            const container = '#test-container';
+            document.querySelector(container).innerHTML = '';
+            const data = [{ d: 1, v: 5 }, { d: 2, v: 5 }];
+
+            const dd = new DrillDowner(container, data, {
+                groupOrder: [],
+                ledger: [{ label: 'Asc', cols: ['d', 'v', 'bal'], sort: ['d'] }],
+                totals: ['v', 'bal'],
+                colProperties: { bal: { balanceBehavior: { initialBalance: 100, add: ['v'], subtract: [] } } }
+            });
+
+            const firstRow = document.querySelector(container + ' tbody tr:first-child');
+            assert.ok(firstRow.classList.contains('drillDowner_initial_row'), 'Initial Balance at top for ascending sort');
+
+            dd.destroy();
+        });
+
+        QUnit.test('Initial Balance row: descending sort places it at bottom', function(assert) {
+            const container = '#test-container';
+            document.querySelector(container).innerHTML = '';
+            const data = [{ d: 1, v: 5 }, { d: 2, v: 5 }];
+
+            const dd = new DrillDowner(container, data, {
+                groupOrder: [],
+                ledger: [{ label: 'Desc', cols: ['d', 'v', 'bal'], sort: ['-d'] }],
+                totals: ['v', 'bal'],
+                colProperties: { bal: { balanceBehavior: { initialBalance: 100, add: ['v'], subtract: [] } } }
+            });
+
+            const allRows = Array.from(document.querySelectorAll(container + ' tbody tr'));
+            const lastRow = allRows[allRows.length - 1];
+            assert.ok(lastRow.classList.contains('drillDowner_initial_row'), 'Initial Balance at bottom for descending sort');
+
+            dd.destroy();
+        });
+
+        QUnit.test('Grouped mode: Initial Balance row renders at top of tbody', function(assert) {
+            const container = '#test-container';
+            document.querySelector(container).innerHTML = '';
+            const data = [
+                { cat: 'A', deposit: 100, withdrawal: 0 },
+                { cat: 'B', deposit: 200, withdrawal: 50 }
+            ];
+
+            const dd = new DrillDowner(container, data, {
+                groupOrder: ['cat'],
+                totals: ['deposit', 'withdrawal', 'balance'],
+                colProperties: {
+                    balance: {
+                        balanceBehavior: { initialBalance: 500, add: ['deposit'], subtract: ['withdrawal'] }
+                    }
+                }
+            });
+
+            const firstRow = document.querySelector(container + ' tbody tr:first-child');
+            assert.ok(firstRow.classList.contains('drillDowner_initial_row'), 'First tbody row is Initial Balance in grouped mode');
+            assert.equal(firstRow.style.fontStyle, 'italic', 'Initial Balance row is styled italic');
+
+            const balCell = firstRow.querySelector('td.drillDowner_num');
+            assert.ok(balCell, 'Initial Balance row has a numeric cell');
+            assert.equal(balCell.textContent.trim(), '500.00', 'Initial Balance cell shows correct value');
 
             dd.destroy();
         });
