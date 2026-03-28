@@ -1,6 +1,6 @@
 /* jshint esversion:11 */
 class DrillDowner {
-    static version = '1.2.5';
+    static version = '1.2.6';
 
     constructor(container, dataArr, options = {}) {
         this.container = typeof container === 'string' ? document.querySelector(container) : container;
@@ -782,7 +782,7 @@ class DrillDowner {
                 const props = this._getColProperty(col, 'balanceBehavior');
                 if(props) {
                     runningTotals[col] = (typeof props.initialBalance === 'number') ? props.initialBalance : 0;
-                    if(typeof props.initialBalance === 'number' && led.cols.includes(col)) hasInitialBalance = true;
+                    if(typeof props.initialBalance === 'number') hasInitialBalance = true;
                 } else {
                     runningTotals[col] = 0;
                 }
@@ -821,7 +821,7 @@ class DrillDowner {
                 tr.insertCell().innerHTML = ''; // Indent cell
 
                 let labelSet = false;
-                led.cols.forEach(col => {
+                orderedCols.forEach(col => {
                     const td = tr.insertCell();
                     const isTotal = this.options.totals.includes(col);
                     if(isTotal) {
