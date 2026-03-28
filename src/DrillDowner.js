@@ -782,7 +782,7 @@ class DrillDowner {
                 const props = this._getColProperty(col, 'balanceBehavior');
                 if(props) {
                     runningTotals[col] = (typeof props.initialBalance === 'number') ? props.initialBalance : 0;
-                    if(typeof props.initialBalance === 'number') hasInitialBalance = true;
+                    if(typeof props.initialBalance === 'number' && led.cols.includes(col)) hasInitialBalance = true;
                 } else {
                     runningTotals[col] = 0;
                 }
@@ -863,6 +863,46 @@ class DrillDowner {
 
             // --- GROUPED VIEW (HIERARCHICAL) ---
         } else {
+            // Render an Initial Balance row if any visible total column has one defined
+            const groupedHasInitialBalance = orderedCols.some(col => {
+                if(!this.options.totals.includes(col)) return false;
+                const props = this._getColProperty(col, 'balanceBehavior');
+                return props && typeof props.initialBalance === 'number';
+            });
+
+            if(groupedHasInitialBalance) {
+                const tr = tbody.insertRow();
+                tr.className = 'drillDowner_initial_row';
+                tr.style.backgroundColor = '#fafafa';
+                tr.style.fontStyle = 'italic';
+
+                let labelSet = false;
+                const indentCell = tr.insertCell();
+
+                orderedCols.forEach(col => {
+                    const td = tr.insertCell();
+                    const isTotal = this.options.totals.includes(col);
+                    if(isTotal) {
+                        td.className = 'drillDowner_num';
+                        const props = this._getColProperty(col, 'balanceBehavior');
+                        if(props && typeof props.initialBalance === 'number') {
+                            const dec = this._getColDecimals(col);
+                            const fmt = this._getColFormatter(col);
+                            td.innerHTML = fmt ? fmt(props.initialBalance, {}) : DrillDowner.formatNumber(props.initialBalance, dec);
+                        }
+                    } else {
+                        td.className = this._getColClass(col);
+                        if(!labelSet) {
+                            td.innerHTML = 'Initial Balance';
+                            labelSet = true;
+                        }
+                    }
+                });
+
+                // If all visible columns are totals, fall back to labelling the indent cell
+                if(!labelSet) indentCell.innerHTML = 'Initial Balance';
+            }
+
             this._sortData(this.dataArr, this.options.groupOrder);
             this._buildFlatRows(this.dataArr, this.options.groupOrder, 0, {}, [], tbody);
         }
