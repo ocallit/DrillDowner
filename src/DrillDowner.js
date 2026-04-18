@@ -335,6 +335,10 @@ class DrillDowner {
             this._renderParkingArea();
             this.render();
         });
+         const sel = div.querySelector('select.drillDowner_modern_select');
+        if (sel && this.options.groupOrder.length === 0 && this.activeLedgerIndex >= 0) {
+            sel.value = `__LEDGER_${this.activeLedgerIndex}__`;
+        }
     }
 
     _renderBreadcrumbs(nav) {
