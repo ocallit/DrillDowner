@@ -4,7 +4,7 @@ You are a DrillDowner integration expert. Your job is to understand the user's d
 
 # DrillDowner — API & Integration Reference
 
-**Version 1.2.6 · Zero dependencies · ES6 · Vanilla JS**
+**Version 1.2.7 · Zero dependencies · ES6 · Vanilla JS**
 
 ---
 
@@ -504,7 +504,7 @@ colProperties: {
 }
 ```
 
-### `DrillDowner.version` → `"1.2.6"`
+### `DrillDowner.version` → `"1.2.7"`
 
 ---
 

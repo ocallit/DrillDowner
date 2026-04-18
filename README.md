@@ -1,6 +1,6 @@
 # DrillDowner
 
-**Version 1.2.6 · Zero dependencies · ES6 · Vanilla JS**
+**Version 1.2.7 · Zero dependencies · ES6 · Vanilla JS**
 
 DrillDowner turns a flat array of objects into an interactive drill-down table with collapsible hierarchy, subtotals, flexible grouping, and optional flat "ledger" views — all with no dependencies and no build step required.
 
@@ -226,11 +226,11 @@ const dd = new DrillDowner(container, dataArr, options)
 
 ### Static utilities
 
-| Method | Description |
-|--------|-------------|
+| Method | Description                       |
+|--------|-----------------------------------|
 | `DrillDowner.formatNumber(n, decimals)` | `1234567.8, 2` → `"1,234,567.80"` |
-| `DrillDowner.formatDate(value, includeTime)` | `"2024-03-15"` → `"15/Mar/24"` |
-| `DrillDowner.version` | `"1.2.6"` |
+| `DrillDowner.formatDate(value, includeTime)` | `"2024-03-15"` → `"15/Mar/24"`    |
+| `DrillDowner.version` | `"1.2.7"`                         |
 
 ### Public properties
 

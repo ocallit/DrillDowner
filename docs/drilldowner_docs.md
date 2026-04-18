@@ -1,6 +1,6 @@
 # DrillDowner — API Reference
 
-**Version 1.2.6 · Zero dependencies · ES6 · Vanilla JS**
+**Version 1.2.7 · Zero dependencies · ES6 · Vanilla JS**
 
 ---
 
@@ -500,7 +500,7 @@ colProperties: {
 }
 ```
 
-### `DrillDowner.version` → `"1.2.6"`
+### `DrillDowner.version` → `"1.2.7"`
 
 ---
 

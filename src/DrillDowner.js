@@ -1,6 +1,6 @@
 /* jshint esversion:11 */
 class DrillDowner {
-    static version = '1.2.6';
+    static version = '1.2.7';
 
     constructor(container, dataArr, options = {}) {
         this.container = typeof container === 'string' ? document.querySelector(container) : container;
@@ -16,6 +16,7 @@ class DrillDowner {
             availableDimensions: null, // all groupable dim keys; enables parking area when set
             ledger: [],
             idPrefix: 'drillDowner' + Math.random().toString(36).slice(2) + '_',
+            caption:"",
             azBarSelector: null,
             azBarOrientation: 'vertical',
             controlsSelector: null,
@@ -23,6 +24,7 @@ class DrillDowner {
             onLabelClick: null,
             leafRenderer: null, // parameters received: (item, level, dimension, groupOrder, options)
             onGroupOrderChange: null,
+            onRendered: null,
         }, options);
 
         if(this.options.ledger && !Array.isArray(this.options.ledger)) {
@@ -737,6 +739,15 @@ class DrillDowner {
 
         const table = document.createElement('table');
         table.className = 'drillDowner_table';
+        const captionOpt = this.options.caption;
+        if(captionOpt != null) {
+            const caption = table.createCaption();
+            if(typeof captionOpt === 'function') {
+                caption.innerHTML = captionOpt(this);
+            } else {
+                caption.innerHTML = captionOpt;
+            }
+        }
         const thead = table.createTHead();
         const hr = thead.insertRow();
         allHeaders.forEach((h, i) => {
@@ -935,6 +946,24 @@ class DrillDowner {
         this.table = table;
         this.table.addEventListener('click', this._boundOnTableClick);
 
+        if(typeof this.options.onRendered === 'function') {
+            this.options.onRendered({
+                instance: this,
+                table: this.table,
+                groupOrder: [...this.options.groupOrder],
+                rowCount: tbody.rows.length
+            });
+        }
+
+        // Dispatch render-complete event to container!
+           this.container.dispatchEvent(new CustomEvent('drilldowner:rendered', {
+                bubbles: true,
+                 detail: {
+                    instance: this,
+                     groupOrder: [...this.options.groupOrder],
+                     rowCount: tbody.rows.length
+                   }
+         }));
     }
 
     _idCounter = 1;

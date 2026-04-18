@@ -1,7 +1,7 @@
 # DrillDowner — Patterns & Templates for AI Agents
 
 **Target audience: AI coding assistants (Claude Code, Claude, etc.)**
-**Version: 1.2.6**
+**Version: 1.2.7**
 
 This document provides copy-paste-ready patterns for the most common DrillDowner integration scenarios. Every snippet is complete and working. Read the pattern that matches the user's situation, adapt the column names, and ship it.
 
